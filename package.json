@@ -7,7 +7,7 @@
     "localweb": "dist/server/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist && cp -r src/public dist/public",
     "dev": "tsc --watch",
     "start": "node dist/server/index.js",
     "test": "vitest run",
