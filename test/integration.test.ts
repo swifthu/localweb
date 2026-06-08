@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
+import { WebSocket } from "ws";
 
 let server: ChildProcess;
 let serverPort: number;
@@ -54,4 +55,36 @@ describe("M1 integration", () => {
     expect(body.ok).toBe(true);
     expect(body.port).toBe(serverPort);
   });
+});
+
+describe("M2 WebSocket push", () => {
+  it("emits added event when a new port appears", async () => {
+    const ws = new WebSocket(`ws://127.0.0.1:${serverPort}/ws`);
+    await new Promise((r) => ws.once("open", r));
+
+    const messages: Array<{ type: string; [k: string]: unknown }> = [];
+    ws.on("message", (m) => messages.push(JSON.parse(m.toString())));
+
+    // Spawn a new ephemeral server
+    const newPort = 19300 + Math.floor(Math.random() * 100);
+    const child = spawn("python3", ["-m", "http.server", String(newPort)], {
+      stdio: "ignore",
+    });
+
+    // Wait for the scanner (2s) + 1s buffer
+    await wait(4000);
+
+    const added = messages.find(
+      (m) =>
+        m.type === "added" &&
+        Array.isArray((m as { services: { port: number }[] }).services) &&
+        (m as { services: { port: number }[] }).services.some(
+          (s) => s.port === newPort
+        )
+    );
+    expect(added).toBeDefined();
+
+    ws.close();
+    child.kill();
+  }, 15000);
 });
