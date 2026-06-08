@@ -9,7 +9,8 @@ import { healthRouter } from "./routes/health.js";
 import { servicesRouter } from "./routes/services.js";
 import { killRouter } from "./routes/kill.js";
 import { configRouter } from "./routes/config.js";
-import type { Service } from "./types.js";
+import { loadConfig } from "./config.js";
+import type { Config, Service } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
@@ -31,10 +32,14 @@ async function main() {
   attachWs(httpServer, hub);
 
   let prevServices: Service[] = [];
+  let config: Config = await loadConfig(configPath);
   const scanner = new Scanner((next) => {
-    currentServices = next;
-    const d = diff(prevServices, next);
-    prevServices = next;
+    const filtered = next.filter((s) =>
+      s.protocol === "tcp" ? config.protocolFilter.tcp : config.protocolFilter.udp
+    );
+    currentServices = filtered;
+    const d = diff(prevServices, filtered);
+    prevServices = filtered;
     if (d.added.length || d.removed.length || d.updated.length) {
       if (d.added.length) hub.broadcast({ type: "added", services: d.added });
       if (d.updated.length) hub.broadcast({ type: "updated", services: d.updated });
@@ -42,6 +47,18 @@ async function main() {
     }
   });
   scanner.start();
+
+  // Periodically reload config (cheap, every 5s) to pick up UI changes
+  setInterval(async () => {
+    const c = await loadConfig(configPath);
+    const tcpChanged = c.protocolFilter.tcp !== config.protocolFilter.tcp;
+    const udpChanged = c.protocolFilter.udp !== config.protocolFilter.udp;
+    config = c;
+    if (tcpChanged || udpChanged) {
+      // Force a full resync by clearing prev
+      prevServices = [];
+    }
+  }, 5000);
 
   app.use(killRouter(hub, () => prevServices));
 
