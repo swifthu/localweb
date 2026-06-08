@@ -127,3 +127,27 @@ describe("M3 kill", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("M4 config", () => {
+  it("GET /api/config returns defaults when no file", async () => {
+    const res = await fetch(`http://127.0.0.1:${serverPort}/api/config`);
+    expect(res.ok).toBe(true);
+    const cfg = await res.json();
+    expect(cfg.protocolFilter.tcp).toBe(true);
+  });
+
+  it("PUT /api/config persists filter change", async () => {
+    const res = await fetch(`http://127.0.0.1:${serverPort}/api/config`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ protocolFilter: { tcp: false, udp: true } }),
+    });
+    expect(res.ok).toBe(true);
+
+    // Re-read
+    const res2 = await fetch(`http://127.0.0.1:${serverPort}/api/config`);
+    const cfg = await res2.json();
+    expect(cfg.protocolFilter.tcp).toBe(false);
+    expect(cfg.protocolFilter.udp).toBe(true);
+  });
+});
