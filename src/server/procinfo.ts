@@ -10,6 +10,8 @@ interface ProcInfo {
   ppid?: number;
 }
 
+export type { ProcInfo };
+
 const cache = new Map<number, ProcInfo>();
 
 function isLinux(): boolean {
@@ -23,7 +25,13 @@ export function clearProcInfoCache(): void {
   cache.clear();
 }
 
-async function readProcInfo(pid: number): Promise<ProcInfo> {
+/**
+ * Public async API. Returns the cached ProcInfo for a PID, awaiting the
+ * one-shot fill if the cache is cold. Use this when the caller can await
+ * (e.g. Scanner.tick(), buildService) so procinfo is guaranteed populated
+ * before the value is consumed.
+ */
+export async function readProcInfo(pid: number): Promise<ProcInfo> {
   if (cache.has(pid)) return cache.get(pid)!;
   const info: ProcInfo = {};
   try {

@@ -261,12 +261,27 @@ describe("M1 v0.2 deep collection", () => {
       // Wait for both to bind and scanner to pick up
       await wait(5000);
       const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
-      const arr = (await res.json()) as Array<{ port: number; groupKey: string }>;
+      const arr = (await res.json()) as Array<{
+        port: number;
+        groupKey: string;
+        exePath?: string;
+      }>;
       const s1 = arr.find((s) => s.port === p1);
       const s2 = arr.find((s) => s.port === p2);
       expect(s1).toBeDefined();
       expect(s2).toBeDefined();
-      expect(s1!.groupKey).toBe(s2!.groupKey);
+      // Strictly test grouping-by-exe behavior: both children are spawned from
+      // the same python3 binary, so exePath must match and groupKey must be
+      // the basename of that exePath — not just "equal to each other", which
+      // a constant-returning computeGroupKey would also satisfy.
+      // (On macOS, lsof -d txt resolves the venv symlink to the framework
+      // python binary, so the basename is e.g. "python3.11" — derive the
+      // expected key from the actual exePath rather than hardcoding.)
+      expect(s1!.exePath).toBeTruthy();
+      expect(s1!.exePath).toBe(s2!.exePath);
+      const expectedKey = s1!.exePath!.split("/").pop() ?? "";
+      expect(s1!.groupKey).toBe(expectedKey);
+      expect(s2!.groupKey).toBe(expectedKey);
     } finally {
       c1.kill("SIGKILL");
       c2.kill("SIGKILL");

@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Service } from "./types.js";
 import { enrich } from "./detector.js";
-import { readExePath, readStartTime, readPpid } from "./procinfo.js";
+import { readProcInfo } from "./procinfo.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -189,26 +189,33 @@ export class Scanner {
 
   private async tick(): Promise<void> {
     const raw = await runLsof();
-    const services: Service[] = await Promise.all(
-      raw.map(async (p) => {
-        const det = await enrich(p);
-        const exePath = readExePath(p.pid);
-        const startedAt = readStartTime(p.pid);
-        const ppid = readPpid(p.pid);
-        const svc = {
-          ...p,
-          label: det.label,
-          confidence: det.confidence,
-          httpHeaders: det.httpHeaders,
-          lastSeen: Date.now(),
-          exePath,
-          startedAt,
-          ppid,
-        };
-        return { ...svc, groupKey: computeGroupKey(svc) };
-      })
-    );
+    const services: Service[] = await Promise.all(raw.map(buildService));
     this.prev = services;
     this.onUpdate(services);
   }
+}
+
+/**
+ * Build a complete Service from a raw lsof entry. Used by both the periodic
+ * Scanner.tick() and the on-demand /api/services route so the two produce
+ * identical output. Awaits procinfo fill (one-shot per PID) so exePath /
+ * startedAt / ppid are populated on the very first call after PID discovery.
+ *
+ * `servicePreset` is left undefined here; M2 will fill it from a presets
+ * registry via lookup(port).
+ */
+export async function buildService(rawPort: RawPort): Promise<Service> {
+  const det = await enrich(rawPort);
+  const info = await readProcInfo(rawPort.pid);
+  const base = {
+    ...rawPort,
+    label: det.label,
+    confidence: det.confidence,
+    httpHeaders: det.httpHeaders,
+    lastSeen: Date.now(),
+    exePath: info.exePath,
+    startedAt: info.startedAt,
+    ppid: info.ppid,
+  };
+  return { ...base, groupKey: computeGroupKey(base) };
 }

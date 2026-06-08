@@ -5,7 +5,8 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
-import { parseLsof, diff, readCwd, computeGroupKey, type RawPort } from "../src/server/scanner.js";
+import { parseLsof, diff, readCwd, computeGroupKey, buildService, type RawPort } from "../src/server/scanner.js";
+import { clearProcInfoCache } from "../src/server/procinfo.js";
 import type { Service } from "../src/server/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -149,5 +150,63 @@ describe("computeGroupKey", () => {
 
   it("handles command with leading whitespace", () => {
     expect(computeGroupKey({ command: "  python3 -m http.server" })).toBe("python3");
+  });
+});
+
+describe("buildService", () => {
+  // buildService looks up procinfo for the PID. We exercise the real cache
+  // path by spawning a long-lived child (same approach as the readCwd test)
+  // and using its PID; clearing the cache first ensures we exercise the
+  // cold-fill path (i.e. the issue-2 fix: readProcInfo must await).
+  it("produces a complete Service with exePath, startedAt, ppid, groupKey", async () => {
+    clearProcInfoCache();
+    const child = spawn(process.execPath, ["-e", "setInterval(()=>{}, 1000)"]);
+    try {
+      const pid = child.pid!;
+      const raw: RawPort = {
+        pid,
+        port: 54321,
+        protocol: "tcp",
+        address: "127.0.0.1",
+        command: "node",
+        user: "u",
+      };
+
+      const svc = await buildService(raw);
+
+      // Raw fields are preserved
+      expect(svc.pid).toBe(pid);
+      expect(svc.port).toBe(54321);
+      expect(svc.command).toBe("node");
+      // Enrichment ran
+      expect(typeof svc.label).toBe("string");
+      expect(svc.confidence).toMatch(/high|medium|low/);
+      expect(svc.lastSeen).toBeTypeOf("number");
+      // procinfo fill completed (the issue-2 fix: we awaited it)
+      expect(svc.exePath).toBeTypeOf("string");
+      expect((svc.exePath ?? "").length).toBeGreaterThan(0);
+      expect(svc.startedAt).toBeTypeOf("number");
+      expect(svc.ppid).toBeTypeOf("number");
+      // groupKey is derived from exePath basename
+      expect(svc.groupKey).toBe("node");
+    } finally {
+      child.kill("SIGKILL");
+    }
+  }, 10000);
+
+  it("falls back to command-based groupKey when procinfo yields no exePath", async () => {
+    clearProcInfoCache();
+    // A clearly-nonexistent PID — procinfo will fill an empty record.
+    const raw: RawPort = {
+      pid: 2_000_000_000,
+      port: 54322,
+      protocol: "tcp",
+      address: "127.0.0.1",
+      command: "python3 -m http.server",
+      user: "u",
+    };
+    const svc = await buildService(raw);
+    expect(svc.exePath).toBeUndefined();
+    expect(svc.groupKey).toBe("python3");
   });
 });
