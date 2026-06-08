@@ -8,6 +8,7 @@ import { WsHub, attachWs, parseClientMessage } from "./ws.js";
 import { healthRouter } from "./routes/health.js";
 import { servicesRouter } from "./routes/services.js";
 import { killRouter } from "./routes/kill.js";
+import { configRouter } from "./routes/config.js";
 import type { Service } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -15,12 +16,14 @@ const publicDir = join(__dirname, "..", "public");
 
 async function main() {
   const port = await findPort(7878, 7899);
+  const configPath = join(process.env.HOME ?? "~", ".config", "localweb", "config.yaml");
   const app = express();
   app.use(express.json());
   app.use("/static", express.static(publicDir));
   app.get("/", (_req, res) => res.sendFile(join(publicDir, "index.html")));
   app.use(healthRouter(port));
   app.use(servicesRouter());
+  app.use(configRouter(() => configPath));
 
   const httpServer = http.createServer(app);
   let currentServices: Service[] = [];
