@@ -1,9 +1,13 @@
 import express from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import http from "node:http";
 import { findPort } from "./port.js";
+import { Scanner, diff, type RawPort } from "./scanner.js";
+import { WsHub, attachWs } from "./ws.js";
 import { healthRouter } from "./routes/health.js";
 import { servicesRouter } from "./routes/services.js";
+import type { Service } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
@@ -17,9 +21,35 @@ async function main() {
   app.use(healthRouter(port));
   app.use(servicesRouter());
 
-  app.listen(port, "127.0.0.1", () => {
+  const httpServer = http.createServer(app);
+  const hub = new WsHub();
+  attachWs(httpServer, hub);
+
+  let prevServices: Service[] = [];
+  const scanner = new Scanner((next) => {
+    const d = diff(prevServices, next);
+    prevServices = next;
+    if (d.added.length || d.removed.length || d.updated.length) {
+      if (d.added.length) hub.broadcast({ type: "added", services: d.added });
+      if (d.updated.length) hub.broadcast({ type: "updated", services: d.updated });
+      if (d.removed.length) hub.broadcast({ type: "removed", pids: d.removed });
+    }
+  });
+  scanner.start();
+
+  httpServer.listen(port, "127.0.0.1", () => {
     console.log(`[localweb] listening on http://127.0.0.1:${port}`);
   });
+
+  const shutdown = () => {
+    console.log("[localweb] shutting down");
+    scanner.stop();
+    hub.close();
+    httpServer.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
 
 main().catch((err) => {
