@@ -18,6 +18,16 @@
         <p id="empty-state" class="hidden">No LISTEN ports detected.</p>
       </section>
     </main>
+    <dialog id="confirm-dialog">
+      <form method="dialog">
+        <h3 id="confirm-title">Confirm</h3>
+        <p id="confirm-body"></p>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button id="confirm-ok" value="ok">OK</button>
+        </menu>
+      </form>
+    </dialog>
     <script type="module" src="/static/app.js"></script>
   </body>
 </html>

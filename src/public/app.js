@@ -2,10 +2,14 @@ const banner = document.getElementById("banner");
 const list = document.getElementById("services-list");
 const emptyState = document.getElementById("empty-state");
 const refreshBtn = document.getElementById("refresh-btn");
+const dialog = document.getElementById("confirm-dialog");
+const dialogTitle = document.getElementById("confirm-title");
+const dialogBody = document.getElementById("confirm-body");
 
 let services = new Map();
 let ws = null;
 let reconnectTimer = null;
+let pendingConfirm = null;
 
 function showBanner(msg) {
   banner.textContent = msg;
@@ -21,6 +25,10 @@ function urlFor(svc) {
   return `http://${host}:${svc.port}`;
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 function render() {
   list.innerHTML = "";
   const arr = [...services.values()].sort((a, b) => a.port - b.port);
@@ -32,6 +40,7 @@ function render() {
   for (const svc of arr) {
     const li = document.createElement("li");
     li.className = "service";
+    li.dataset.pid = String(svc.pid);
     const url = urlFor(svc);
     li.innerHTML = `
       <div>
@@ -40,14 +49,11 @@ function render() {
       </div>
       <div class="actions">
         <a href="${url}" target="_blank" rel="noopener">Open</a>
+        <button data-action="kill" data-pid="${svc.pid}">Kill</button>
       </div>
     `;
     list.appendChild(li);
   }
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 function applySnapshot(arr) {
@@ -67,6 +73,58 @@ function applyUpdated(arr) {
   render();
 }
 
+function confirmDialog(title, body) {
+  return new Promise((resolve) => {
+    dialogTitle.textContent = title;
+    dialogBody.textContent = body;
+    pendingConfirm = resolve;
+    dialog.showModal();
+  });
+}
+
+dialog.addEventListener("close", () => {
+  if (pendingConfirm) {
+    const ok = dialog.returnValue === "ok";
+    pendingConfirm(ok);
+    pendingConfirm = null;
+  }
+});
+
+list.addEventListener("click", async (ev) => {
+  const target = ev.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (target.dataset.action === "kill") {
+    const pid = Number(target.dataset.pid);
+    const svc = services.get(pid);
+    if (!svc) return;
+    const ok = await confirmDialog(
+      "Confirm kill",
+      `Terminate ${svc.label} on port ${svc.port} (pid ${svc.pid})?`
+    );
+    if (ok) ws?.send(JSON.stringify({ type: "kill", pid }));
+  }
+});
+
+function handleServerMsg(msg) {
+  switch (msg.type) {
+    case "snapshot": applySnapshot(msg.services); break;
+    case "added": applyAdded(msg.services); break;
+    case "removed": applyRemoved(msg.pids); break;
+    case "updated": applyUpdated(msg.services); break;
+    case "kill-escalate": {
+      const svc = services.get(msg.pid);
+      const port = svc?.port ?? msg.port;
+      confirmDialog(
+        "Process did not exit",
+        `PID ${msg.pid} (port ${port}) is still running. Force kill with SIGKILL?`
+      ).then((ok) => {
+        if (ok) ws?.send(JSON.stringify({ type: "kill-force", pid: msg.pid }));
+      });
+      break;
+    }
+  }
+}
+
 async function loadSnapshot() {
   try {
     const res = await fetch("/api/services");
@@ -81,26 +139,17 @@ async function loadSnapshot() {
 function connectWs() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   ws = new WebSocket(`${proto}//${location.host}/ws`);
-  ws.addEventListener("open", () => {
-    hideBanner();
-  });
+  ws.addEventListener("open", hideBanner);
   ws.addEventListener("message", (ev) => {
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
-    switch (msg.type) {
-      case "snapshot": applySnapshot(msg.services); break;
-      case "added": applyAdded(msg.services); break;
-      case "removed": applyRemoved(msg.pids); break;
-      case "updated": applyUpdated(msg.services); break;
-    }
+    handleServerMsg(msg);
   });
   ws.addEventListener("close", () => {
     showBanner("WebSocket disconnected, retrying...");
     reconnectTimer = setTimeout(connectWs, 3000);
   });
-  ws.addEventListener("error", () => {
-    ws.close();
-  });
+  ws.addEventListener("error", () => ws.close());
 }
 
 refreshBtn.addEventListener("click", loadSnapshot);
