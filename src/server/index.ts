@@ -22,21 +22,24 @@ const publicDir = join(__dirname, "..", "public");
 
 interface CliArgs {
   port?: number;
+  host: string;
   noPreshared: boolean;
   configPath: string;
 }
 function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = {
+    host: "0.0.0.0",
     noPreshared: false,
     configPath: DEFAULT_CONFIG_PATH,
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--port") out.port = Number(argv[++i]);
+    else if (a === "--host") out.host = argv[++i];
     else if (a === "--no-preshared") out.noPreshared = true;
     else if (a === "--config") out.configPath = expandHome(argv[++i]);
     else if (a === "--help" || a === "-h") {
-      console.log(`localweb [--port N] [--no-preshared] [--config PATH]`);
+      console.log(`localweb [--port N] [--host IP] [--no-preshared] [--config PATH]`);
       process.exit(0);
     }
   }
@@ -115,8 +118,12 @@ async function main() {
   app.use(presharedRouter(preshared));
   app.use(presetsRouter());
 
-  httpServer.listen(port, "127.0.0.1", () => {
-    console.log(`[localweb] listening on http://127.0.0.1:${port}`);
+  httpServer.listen(port, args.host, () => {
+    console.log(`[localweb] listening on http://${args.host}:${port}`);
+    if (args.host === "0.0.0.0") {
+      console.log(`[localweb] bound to all interfaces — accessible from your network`);
+      console.log(`[localweb] to restrict, pass --host 127.0.0.1`);
+    }
   });
 
   const shutdown = () => {
