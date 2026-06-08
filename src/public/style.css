@@ -112,6 +112,22 @@ a.btn:hover { border-color: var(--accent); }
 button:disabled,
 a.btn:disabled { opacity: 0.4; cursor: not-allowed; }
 button.danger { color: var(--danger); }
+button.port-chip {
+  font-family: ui-monospace, Menlo, "SF Mono", monospace;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--bg-elev-2);
+  color: var(--fg);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+button.port-chip:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
 
 ul#services-list, ul#preshared-list {
   list-style: none;

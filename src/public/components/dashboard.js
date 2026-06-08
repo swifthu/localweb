@@ -26,12 +26,17 @@ function topGroups(services, n = 5) {
     .slice(0, n);
 }
 
+function occupiedPorts(services) {
+  return [...new Set(services.map((s) => s.port))].sort((a, b) => a - b);
+}
+
 export function renderDashboard(s = state) {
   const services = [...s.services.values()];
   const filtered = services.filter((svc) => matchFilter(svc, s.filter));
   const { tcp, udp } = countByProtocol(services);
   const groups = countByGroup(services);
   const top = topGroups(services);
+  const ports = occupiedPorts(services);
 
   const el = grid();
   el.innerHTML = "";
@@ -63,6 +68,25 @@ export function renderDashboard(s = state) {
     el.appendChild(topCard);
   }
 
+  // Occupied ports (clickable chips; click → fill search box)
+  if (ports.length > 0) {
+    const portsCard = document.createElement("div");
+    portsCard.className = "dash-card";
+    portsCard.style.gridColumn = "1 / -1";
+    portsCard.innerHTML = `
+      <div class="label">OCCUPIED PORTS</div>
+      <div class="port-chips" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+        ${ports
+          .map(
+            (p) =>
+              `<button class="btn port-chip" data-port="${p}" type="button">${p}</button>`
+          )
+          .join("")}
+      </div>
+    `;
+    el.appendChild(portsCard);
+  }
+
   // Empty state
   if (filtered.length === 0 && services.length === 0) {
     const empty = document.createElement("div");
@@ -74,6 +98,21 @@ export function renderDashboard(s = state) {
     empty.textContent = "No services running. Start one to see it here.";
     el.appendChild(empty);
   }
+}
+
+export function initDashboard() {
+  // Event delegation: single click listener on the grid container
+  // (re-renders don't accumulate handlers, matching services.js init pattern).
+  const el = grid();
+  el.addEventListener("click", (ev) => {
+    const t = ev.target;
+    if (!(t instanceof HTMLElement)) return;
+    if (t.classList.contains("port-chip") && t.dataset.port) {
+      window.dispatchEvent(
+        new CustomEvent("port-search", { detail: { port: t.dataset.port } })
+      );
+    }
+  });
 }
 
 function appendCard(parent, label, value, modifier) {

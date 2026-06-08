@@ -13,7 +13,7 @@ import {
   applyFilter,
   subscribe,
 } from "./state.js";
-import { renderDashboard } from "./components/dashboard.js";
+import { renderDashboard, initDashboard } from "./components/dashboard.js";
 import { renderServices, initServices } from "./components/services.js";
 
 const banner = document.getElementById("banner");
@@ -101,6 +101,14 @@ window.addEventListener("services-action", async (ev) => {
   else if (action === "copy") await handleCopyClick(url, ev.detail.button);
 });
 
+// Dashboard port chip click → fill the search box + apply filter
+window.addEventListener("port-search", (ev) => {
+  const port = String(ev.detail.port);
+  const searchInput = document.getElementById("search-input");
+  if (searchInput) searchInput.value = port;
+  applyFilter({ ...state.filter, search: port });
+});
+
 // Initial render wiring
 subscribe((s) => {
   renderDashboard(s);
@@ -113,6 +121,7 @@ initDialog();
 initFilters();
 initPreshared();
 initServices();
+initDashboard();
 loadFilter();
 loadSnapshot().then(connectWs);
 
