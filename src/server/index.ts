@@ -54,6 +54,10 @@ async function main() {
   app.use(servicesRouter());
   app.use(configRouter(() => configPath));
 
+  app.get("/api/status", (_req, res) => {
+    res.json({ lastScanError, hubClients: hub.clientCount() });
+  });
+
   const httpServer = http.createServer(app);
   let currentServices: Service[] = [];
   const hub = new WsHub(
@@ -72,6 +76,10 @@ async function main() {
   if (!args.noPreshared) {
     preshared.loadSpecs(config.preshared);
   }
+  let lastScanError: string | null = null;
+  process.on("unhandledRejection", (err) => {
+    lastScanError = err instanceof Error ? err.message : String(err);
+  });
   const scanner = new Scanner((next) => {
     const filtered = next.filter((s) =>
       s.protocol === "tcp" ? config.protocolFilter.tcp : config.protocolFilter.udp

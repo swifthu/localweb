@@ -263,3 +263,13 @@ presharedList.addEventListener("click", async (ev) => {
 });
 
 loadPreshared();
+
+async function checkStatus() {
+  try {
+    const res = await fetch("/api/status");
+    const s = await res.json();
+    if (s.lastScanError) showBanner(`Scan error: ${s.lastScanError}`);
+  } catch {}
+}
+setInterval(checkStatus, 5000);
+checkStatus();
