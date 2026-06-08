@@ -32,3 +32,8 @@ dialog menu { display: flex; gap: 8px; justify-content: flex-end; margin: 12px 0
 dialog button.danger { color: var(--danger); }
 #filter-bar { display: flex; gap: 12px; margin: 8px 0; font-size: 13px; color: var(--muted); }
 #filter-bar label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+#preshared-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
+li.preshared { background: var(--panel); border: 1px solid #2a2e36; border-radius: 6px; padding: 12px 16px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; }
+.status-running { color: var(--ok); }
+.status-stopped { color: var(--muted); }
+.status-failed { color: var(--danger); }

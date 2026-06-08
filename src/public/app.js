@@ -122,6 +122,10 @@ function handleServerMsg(msg) {
       });
       break;
     }
+    case "preshared-update":
+      preshared.set(msg.service.name, msg.service);
+      renderPreshared();
+      break;
   }
 }
 
@@ -186,3 +190,61 @@ async function saveFilter() {
 filterTcp.addEventListener("change", saveFilter);
 filterUdp.addEventListener("change", saveFilter);
 loadFilter();
+
+const presharedList = document.getElementById("preshared-list");
+const presharedEmpty = document.getElementById("preshared-empty");
+let preshared = new Map();
+
+function renderPreshared() {
+  presharedList.innerHTML = "";
+  const arr = [...preshared.values()];
+  if (arr.length === 0) {
+    presharedEmpty.classList.remove("hidden");
+    return;
+  }
+  presharedEmpty.classList.add("hidden");
+  for (const s of arr) {
+    const li = document.createElement("li");
+    li.className = "preshared";
+    li.innerHTML = `
+      <div>
+        <div><strong>${escapeHtml(s.name)}</strong> <span class="status-${s.status}">· ${s.status}</span></div>
+        <div class="meta">${escapeHtml(s.cmd)}${s.pid ? ` · pid ${s.pid}` : ""}</div>
+      </div>
+      <div class="actions">
+        <button data-action="preshared-start" data-name="${escapeHtml(s.name)}" ${s.status === "running" ? "disabled" : ""}>Start</button>
+        <button data-action="preshared-stop" data-name="${escapeHtml(s.name)}" ${s.status !== "running" ? "disabled" : ""}>Stop</button>
+        <button data-action="preshared-restart" data-name="${escapeHtml(s.name)}">Restart</button>
+      </div>
+    `;
+    presharedList.appendChild(li);
+  }
+}
+
+async function loadPreshared() {
+  try {
+    const res = await fetch("/api/preshared");
+    const arr = await res.json();
+    preshared = new Map(arr.map((s) => [s.name, s]));
+    renderPreshared();
+  } catch (err) {
+    showBanner(`Failed to load preshared: ${err.message}`);
+  }
+}
+
+presharedList.addEventListener("click", async (ev) => {
+  const target = ev.target;
+  if (!(target instanceof HTMLElement)) return;
+  const action = target.dataset.action;
+  const name = target.dataset.name;
+  if (!action || !name) return;
+  const path = `/api/preshared/${encodeURIComponent(name)}/${action.replace("preshared-", "")}`;
+  try {
+    const res = await fetch(path, { method: "POST" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (err) {
+    showBanner(`Action failed: ${err.message}`);
+  }
+});
+
+loadPreshared();
