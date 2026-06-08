@@ -9,7 +9,7 @@ import { healthRouter } from "./routes/health.js";
 import { servicesRouter } from "./routes/services.js";
 import { killRouter } from "./routes/kill.js";
 import { configRouter } from "./routes/config.js";
-import { loadConfig } from "./config.js";
+import { loadConfig, DEFAULT_CONFIG_PATH } from "./config.js";
 import type { Config, Service } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -17,7 +17,7 @@ const publicDir = join(__dirname, "..", "public");
 
 async function main() {
   const port = await findPort(7878, 7899);
-  const configPath = join(process.env.HOME ?? "~", ".config", "localweb", "config.yaml");
+  const configPath = DEFAULT_CONFIG_PATH;
   const app = express();
   app.use(express.json());
   app.use("/static", express.static(publicDir));

@@ -2,13 +2,25 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
 import { WebSocket } from "ws";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 let server: ChildProcess;
 let serverPort: number;
 let pyServer: ChildProcess;
 let pyPort: number;
+let tmpConfigDir: string;
 
 beforeAll(async () => {
+  // Isolate the server's config so the M4 PUT test cannot pollute the real
+  // user's ~/.config/localweb/config.yaml. The child process inherits
+  // process.env by default, so setting LOCALWEB_CONFIG here is picked up
+  // by the spawned `node dist/server/index.js` (which reads
+  // DEFAULT_CONFIG_PATH at module import time).
+  tmpConfigDir = mkdtempSync(join(tmpdir(), `localweb-it-${Date.now()}-`));
+  process.env.LOCALWEB_CONFIG = join(tmpConfigDir, "config.yaml");
+
   // Spawn a long-lived python server we'll find via the API
   pyPort = 19000 + Math.floor(Math.random() * 100);
   pyServer = spawn("python3", ["-m", "http.server", String(pyPort)], {
@@ -29,6 +41,10 @@ afterAll(async () => {
   pyServer?.kill();
   server?.kill();
   await wait(200);
+  if (tmpConfigDir) {
+    rmSync(tmpConfigDir, { recursive: true, force: true });
+  }
+  delete process.env.LOCALWEB_CONFIG;
 });
 
 describe("M1 integration", () => {
@@ -59,34 +75,57 @@ describe("M1 integration", () => {
 
 describe("M2 WebSocket push", () => {
   it("emits added event when a new port appears", async () => {
+    // Pick a port range disjoint from the M1/M3 ranges to avoid races if
+    // a previous run left a python child on the port.
+    const newPort = 19700 + Math.floor(Math.random() * 100);
+
+    // Subscribe BEFORE spawning the child so we don't miss the `added`
+    // broadcast that fires on the scanner's first tick that sees the new
+    // port.
     const ws = new WebSocket(`ws://127.0.0.1:${serverPort}/ws`);
     await new Promise((r) => ws.once("open", r));
 
     const messages: Array<{ type: string; [k: string]: unknown }> = [];
     ws.on("message", (m) => messages.push(JSON.parse(m.toString())));
 
-    // Spawn a new ephemeral server
-    const newPort = 19300 + Math.floor(Math.random() * 100);
     const child = spawn("python3", ["-m", "http.server", String(newPort)], {
-      stdio: "ignore",
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
-    // Wait for the scanner (2s) + 1s buffer
-    await wait(4000);
+    try {
+      // Wait for the python child to actually bind the port. python's
+      // http.server prints "Serving HTTP on ..." once it is listening;
+      // resolve as soon as we see it, with a 3s safety net.
+      const ready = new Promise<void>((resolve, reject) => {
+        const onData = (buf: Buffer) => {
+          if (buf.toString().toLowerCase().includes("serving http")) resolve();
+        };
+        child.stderr!.on("data", onData);
+        child.stdout!.on("data", onData);
+        child.once("error", reject);
+        child.once("exit", () => reject(new Error("python child exited before listening")));
+      });
+      await Promise.race([ready, wait(3000)]);
 
-    const added = messages.find(
-      (m) =>
-        m.type === "added" &&
-        Array.isArray((m as { services: { port: number }[] }).services) &&
-        (m as { services: { port: number }[] }).services.some(
-          (s) => s.port === newPort
-        )
-    );
-    expect(added).toBeDefined();
+      // Scanner ticks every 2s; budget ~2 ticks + buffer to absorb jitter
+      // from child start vs scanner phase.
+      await wait(6000);
 
-    ws.close();
-    child.kill();
-  }, 15000);
+      const added = messages.find(
+        (m) =>
+          m.type === "added" &&
+          Array.isArray((m as { services: { port: number }[] }).services) &&
+          (m as { services: { port: number }[] }).services.some(
+            (s) => s.port === newPort
+          )
+      );
+      expect(added).toBeDefined();
+
+      ws.close();
+    } finally {
+      child.kill();
+    }
+  }, 20000);
 });
 
 describe("M3 kill", () => {

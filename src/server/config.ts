@@ -5,12 +5,9 @@ import { defaultConfig, type Config } from "./types.js";
 
 export { defaultConfig };
 
-export const DEFAULT_CONFIG_PATH = join(
-  process.env.HOME ?? "~",
-  ".config",
-  "localweb",
-  "config.yaml"
-);
+export const DEFAULT_CONFIG_PATH =
+  process.env.LOCALWEB_CONFIG ??
+  join(process.env.HOME ?? "~", ".config", "localweb", "config.yaml");
 
 export async function loadConfig(path: string = DEFAULT_CONFIG_PATH): Promise<Config> {
   let text: string;
