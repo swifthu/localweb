@@ -154,3 +154,35 @@ function connectWs() {
 
 refreshBtn.addEventListener("click", loadSnapshot);
 loadSnapshot().then(connectWs);
+
+const filterTcp = document.getElementById("filter-tcp");
+const filterUdp = document.getElementById("filter-udp");
+
+async function loadFilter() {
+  try {
+    const res = await fetch("/api/config");
+    const cfg = await res.json();
+    filterTcp.checked = !!cfg.protocolFilter.tcp;
+    filterUdp.checked = !!cfg.protocolFilter.udp;
+  } catch (err) {
+    showBanner(`Failed to load config: ${err.message}`);
+  }
+}
+
+async function saveFilter() {
+  try {
+    await fetch("/api/config", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        protocolFilter: { tcp: filterTcp.checked, udp: filterUdp.checked },
+      }),
+    });
+  } catch (err) {
+    showBanner(`Failed to save filter: ${err.message}`);
+  }
+}
+
+filterTcp.addEventListener("change", saveFilter);
+filterUdp.addEventListener("change", saveFilter);
+loadFilter();

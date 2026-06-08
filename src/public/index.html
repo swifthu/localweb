@@ -13,6 +13,10 @@
     </header>
     <main>
       <section id="services-section">
+        <div id="filter-bar">
+          <label><input type="checkbox" id="filter-tcp" checked /> TCP</label>
+          <label><input type="checkbox" id="filter-udp" /> UDP</label>
+        </div>
         <h2>Active services <button id="refresh-btn">Refresh</button></h2>
         <ul id="services-list"></ul>
         <p id="empty-state" class="hidden">No LISTEN ports detected.</p>
