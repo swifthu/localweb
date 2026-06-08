@@ -4,9 +4,10 @@ import { dirname, join } from "node:path";
 import http from "node:http";
 import { findPort } from "./port.js";
 import { Scanner, diff, type RawPort } from "./scanner.js";
-import { WsHub, attachWs } from "./ws.js";
+import { WsHub, attachWs, parseClientMessage } from "./ws.js";
 import { healthRouter } from "./routes/health.js";
 import { servicesRouter } from "./routes/services.js";
+import { killRouter } from "./routes/kill.js";
 import type { Service } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -38,6 +39,18 @@ async function main() {
     }
   });
   scanner.start();
+
+  app.use(killRouter(hub, () => prevServices));
+
+  // Handle client messages: kill-force after escalation
+  hub.server.on("connection", (ws) => {
+    ws.on("message", (raw) => {
+      const msg = parseClientMessage(raw.toString());
+      if (msg?.type === "kill-force") {
+        import("./proc.js").then(({ kill }) => kill(msg.pid));
+      }
+    });
+  });
 
   httpServer.listen(port, "127.0.0.1", () => {
     console.log(`[localweb] listening on http://127.0.0.1:${port}`);
