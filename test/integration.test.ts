@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
 import { WebSocket } from "ws";
@@ -45,6 +45,20 @@ afterAll(async () => {
     rmSync(tmpConfigDir, { recursive: true, force: true });
   }
   delete process.env.LOCALWEB_CONFIG;
+});
+
+// Reset the on-disk config between describes so M4 GET (which expects the
+// default, no-file state) sees a clean slate even if a prior describe's
+// PUT test already mutated the same LOCALWEB_CONFIG path.
+beforeEach(() => {
+  if (tmpConfigDir) {
+    const cfgPath = join(tmpConfigDir, "config.yaml");
+    try {
+      rmSync(cfgPath, { force: true });
+    } catch {
+      // file didn't exist — already clean
+    }
+  }
 });
 
 describe("M1 integration", () => {

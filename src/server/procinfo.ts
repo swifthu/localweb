@@ -166,7 +166,11 @@ async function readCommand(pid: number): Promise<string | undefined> {
         "-o", "comm=", "-p", String(pid),
       ]);
       const trimmed = stdout.trim();
-      return trimmed || undefined;
+      if (!trimmed) return undefined;
+      // macOS ps returns the full symlink-resolved path (e.g. /opt/homebrew/.../Python).
+      // Trim to the basename so the chain reads as "Python" not the full cellar path.
+      const parts = trimmed.split("/");
+      return parts[parts.length - 1] || trimmed;
     }
   } catch {
     return undefined;
