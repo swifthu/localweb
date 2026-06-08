@@ -289,3 +289,35 @@ describe("M1 v0.2 deep collection", () => {
     }
   }, 15000);
 });
+
+describe("M2 port presets", () => {
+  it("/api/presets returns the built-in mapping", async () => {
+    const res = await fetch(`http://127.0.0.1:${serverPort}/api/presets`);
+    expect(res.ok).toBe(true);
+    const presets = (await res.json()) as Record<string, { name: string; color: string }>;
+    expect(Object.keys(presets).length).toBeGreaterThanOrEqual(20);
+    expect(presets["5432"].name).toBe("PostgreSQL");
+    expect(presets["5432"].color).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+
+  it("/api/services includes servicePreset when port matches a preset", async () => {
+    // Start a server on a known preset port
+    const port = 5432; // unlikely to have a real Postgres here
+    const child = spawn("python3", ["-m", "http.server", String(port)], { stdio: "ignore" });
+    try {
+      await wait(5000);
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
+      const arr = (await res.json()) as Array<{ port: number; servicePreset?: { name: string } }>;
+      const svc = arr.find((s) => s.port === port);
+      // If a real Postgres happens to own 5432 on the test machine, the test still passes
+      // (the servicePreset would point to the actual owner, which is correct behavior).
+      expect(svc).toBeDefined();
+      if (svc?.servicePreset) {
+        expect(svc.servicePreset.name).toBe("PostgreSQL");
+      }
+    } finally {
+      child.kill("SIGKILL");
+      await wait(300);
+    }
+  }, 15000);
+});

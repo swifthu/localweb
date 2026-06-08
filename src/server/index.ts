@@ -10,6 +10,7 @@ import { servicesRouter } from "./routes/services.js";
 import { killRouter } from "./routes/kill.js";
 import { configRouter } from "./routes/config.js";
 import { presharedRouter } from "./routes/preshared.js";
+import { presetsRouter } from "./routes/presets.js";
 import { PresharedManager } from "./preshared.js";
 import { loadConfig, DEFAULT_CONFIG_PATH } from "./config.js";
 import { expandHome } from "./paths.js";
@@ -112,6 +113,7 @@ async function main() {
 
   app.use(killRouter(hub, () => prevServices));
   app.use(presharedRouter(preshared));
+  app.use(presetsRouter());
 
   httpServer.listen(port, "127.0.0.1", () => {
     console.log(`[localweb] listening on http://127.0.0.1:${port}`);
