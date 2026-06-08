@@ -1,3 +1,124 @@
-export function renderServices(_state) {
-  // Implemented in M4
+import { state } from "../state.js";
+import { escapeHtml } from "./utils.js";
+
+const list = () => document.getElementById("services-list");
+const emptyState = () => document.getElementById("empty-state");
+
+function matchFilter(svc, filter) {
+  if (svc.protocol === "tcp" && !filter.tcp) return false;
+  if (svc.protocol === "udp" && !filter.udp) return false;
+  if (filter.search) {
+    const haystack = `${svc.label} ${svc.command} ${svc.exePath ?? ""} ${svc.port}`.toLowerCase();
+    if (!haystack.includes(filter.search)) return false;
+  }
+  return true;
+}
+
+function groupBy(services, key) {
+  const groups = new Map();
+  for (const s of services) {
+    const k = key(s);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(s);
+  }
+  return groups;
+}
+
+function renderServiceCard(svc) {
+  const li = document.createElement("li");
+  li.className = "service";
+  li.dataset.pid = String(svc.pid);
+  const host = svc.address === "0.0.0.0" || svc.address === "::" ? "localhost" : svc.address;
+  const url = `http://${host}:${svc.port}`;
+  const presetBadge = svc.servicePreset
+    ? `<span class="preset" style="background:${escapeHtml(svc.servicePreset.color)}22; color:${escapeHtml(svc.servicePreset.color)};">${escapeHtml(svc.servicePreset.name)}</span>`
+    : "";
+  const startedAgo = svc.startedAt ? formatAgo(svc.startedAt) : "";
+  li.innerHTML = `
+    <div>
+      <div class="label">${escapeHtml(svc.label)} ${presetBadge} <span class="confidence-${svc.confidence}">· ${svc.confidence}</span></div>
+      <div class="meta">pid ${svc.pid} · ${escapeHtml(svc.command)} · ${escapeHtml(svc.address)}:${svc.port}${startedAgo ? ` · started ${escapeHtml(startedAgo)}` : ""}</div>
+      ${svc.exePath ? `<div class="meta" style="font-size: 11px;">${escapeHtml(svc.exePath)}</div>` : ""}
+    </div>
+    <div class="actions">
+      <a href="${url}" target="_blank" rel="noopener">Open</a>
+      <button data-action="copy" data-url="${url}">Copy URL</button>
+      <button data-action="kill" data-pid="${svc.pid}">Kill</button>
+    </div>
+  `;
+  return li;
+}
+
+function formatAgo(epoch) {
+  const diff = Date.now() - epoch;
+  if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`;
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return `${Math.floor(diff / 86_400_000)}d ago`;
+}
+
+function renderGroup(name, services) {
+  const li = document.createElement("li");
+  li.className = "service-group";
+  li.style.cssText = "background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: 8px; padding: 0;";
+  const headerId = `group-${name.replace(/[^a-z0-9]/gi, "-")}`;
+  li.innerHTML = `
+    <details>
+      <summary style="padding: 12px 18px; cursor: pointer; display: flex; align-items: center; gap: 12px; user-select: none;">
+        <strong style="flex: 1; font-family: ui-monospace, monospace;">${escapeHtml(name)}</strong>
+        <span style="color: var(--fg-muted); font-size: 12px;">${services.length} port${services.length === 1 ? "" : "s"}</span>
+        <span style="color: var(--fg-muted);">▾</span>
+      </summary>
+      <ul id="${headerId}" style="list-style: none; padding: 0 12px 12px; margin: 0; display: flex; flex-direction: column; gap: 6px;"></ul>
+    </details>
+  `;
+  const inner = li.querySelector(`#${headerId}`);
+  for (const svc of services) inner.appendChild(renderServiceCard(svc));
+  return li;
+}
+
+export function renderServices(s = state) {
+  const el = list();
+  el.innerHTML = "";
+  const services = [...s.services.values()].filter((svc) => matchFilter(svc, s.filter));
+
+  if (services.length === 0) {
+    emptyState().classList.remove("hidden");
+    return;
+  }
+  emptyState().classList.add("hidden");
+
+  if (s.groupByExe) {
+    const groups = groupBy(services, (svc) => svc.groupKey);
+    const sortedKeys = [...groups.keys()].sort();
+    for (const k of sortedKeys) {
+      el.appendChild(renderGroup(k, groups.get(k).sort((a, b) => a.port - b.port)));
+    }
+  } else {
+    for (const svc of services.sort((a, b) => a.port - b.port)) {
+      el.appendChild(renderServiceCard(svc));
+    }
+  }
+
+  // Wire up click delegation
+  el.addEventListener("click", handleClick, { once: true });
+}
+
+function handleClick(ev) {
+  const t = ev.target;
+  if (!(t instanceof HTMLElement)) return;
+  const action = t.dataset.action;
+  if (!action) return;
+  if (action === "kill" || action === "copy") {
+    window.dispatchEvent(
+      new CustomEvent("services-action", {
+        detail: {
+          action,
+          pid: Number(t.dataset.pid),
+          url: t.dataset.url,
+          button: t,
+        },
+      })
+    );
+  }
 }
