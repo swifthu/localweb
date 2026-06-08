@@ -155,7 +155,6 @@ export function diff(prev: Service[], next: Service[]): DiffResult {
 export class Scanner {
   private prev: Service[] = [];
   private timer: NodeJS.Timeout | null = null;
-  private cmdlineCache = new Map<number, string>();
 
   constructor(
     private onUpdate: (services: Service[]) => void,
@@ -175,12 +174,6 @@ export class Scanner {
 
   private async tick(): Promise<void> {
     const raw = await runLsof();
-    // Fetch full command line for each new pid (best effort)
-    for (const p of raw) {
-      if (!this.cmdlineCache.has(p.pid)) {
-        this.cmdlineCache.set(p.pid, await readCmdline(p.pid));
-      }
-    }
     const services: Service[] = await Promise.all(
       raw.map(async (p) => {
         const det = await enrich(p);
@@ -195,14 +188,5 @@ export class Scanner {
     );
     this.prev = services;
     this.onUpdate(services);
-  }
-}
-
-async function readCmdline(pid: number): Promise<string> {
-  try {
-    const { stdout } = await execFileAsync("ps", ["-o", "command=", "-p", String(pid)]);
-    return stdout.trim();
-  } catch {
-    return "";
   }
 }

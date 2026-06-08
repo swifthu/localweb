@@ -22,11 +22,13 @@ async function main() {
   app.use(servicesRouter());
 
   const httpServer = http.createServer(app);
-  const hub = new WsHub();
+  let currentServices: Service[] = [];
+  const hub = new WsHub(() => ({ type: "snapshot", services: currentServices }));
   attachWs(httpServer, hub);
 
   let prevServices: Service[] = [];
   const scanner = new Scanner((next) => {
+    currentServices = next;
     const d = diff(prevServices, next);
     prevServices = next;
     if (d.added.length || d.removed.length || d.updated.length) {
