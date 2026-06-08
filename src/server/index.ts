@@ -9,6 +9,8 @@ import { healthRouter } from "./routes/health.js";
 import { servicesRouter } from "./routes/services.js";
 import { killRouter } from "./routes/kill.js";
 import { configRouter } from "./routes/config.js";
+import { presharedRouter } from "./routes/preshared.js";
+import { PresharedManager } from "./preshared.js";
 import { loadConfig, DEFAULT_CONFIG_PATH } from "./config.js";
 import type { Config, Service } from "./types.js";
 
@@ -33,6 +35,8 @@ async function main() {
 
   let prevServices: Service[] = [];
   let config: Config = await loadConfig(configPath);
+  const preshared = new PresharedManager();
+  preshared.loadSpecs(config.preshared);
   const scanner = new Scanner((next) => {
     const filtered = next.filter((s) =>
       s.protocol === "tcp" ? config.protocolFilter.tcp : config.protocolFilter.udp
@@ -47,6 +51,7 @@ async function main() {
     }
   });
   scanner.start();
+  await preshared.autostartAll();
 
   // Periodically reload config (cheap, every 5s) to pick up UI changes
   setInterval(async () => {
@@ -61,6 +66,7 @@ async function main() {
   }, 5000);
 
   app.use(killRouter(hub, () => prevServices));
+  app.use(presharedRouter(preshared, hub));
 
   // Handle client messages: kill-force after escalation
   hub.server.on("connection", (ws) => {
@@ -81,7 +87,7 @@ async function main() {
     scanner.stop();
     hub.close();
     httpServer.close();
-    process.exit(0);
+    preshared.shutdown().finally(() => process.exit(0));
   };
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
