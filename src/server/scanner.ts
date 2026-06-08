@@ -152,6 +152,20 @@ export function diff(prev: Service[], next: Service[]): DiffResult {
   return { added, removed, updated };
 }
 
+export function computeGroupKey(s: { exePath?: string; command: string }): string {
+  if (s.exePath) {
+    const parts = s.exePath.split("/");
+    return parts[parts.length - 1] || "unknown";
+  }
+  const firstToken = s.command.trim().split(/\s+/)[0];
+  if (!firstToken) return "unknown";
+  if (firstToken.includes("/")) {
+    const parts = firstToken.split("/");
+    return parts[parts.length - 1] || "unknown";
+  }
+  return firstToken;
+}
+
 export class Scanner {
   private prev: Service[] = [];
   private timer: NodeJS.Timeout | null = null;
@@ -177,13 +191,14 @@ export class Scanner {
     const services: Service[] = await Promise.all(
       raw.map(async (p) => {
         const det = await enrich(p);
-        return {
+        const svc = {
           ...p,
           label: det.label,
           confidence: det.confidence,
           httpHeaders: det.httpHeaders,
           lastSeen: Date.now(),
         };
+        return { ...svc, groupKey: computeGroupKey(svc) };
       })
     );
     this.prev = services;

@@ -10,6 +10,19 @@ export interface Service {
   confidence: "high" | "medium" | "low";
   httpHeaders?: Record<string, string>;
   lastSeen: number;
+
+  // v0.2 additions
+  exePath?: string;
+  startedAt?: number;
+  ppid?: number;
+  servicePreset?: Preset;
+  groupKey: string;
+}
+
+export interface Preset {
+  name: string;
+  icon: string;
+  color: string;
 }
 
 export interface Preshared {

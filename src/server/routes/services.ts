@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { runLsof } from "../scanner.js";
+import { runLsof, computeGroupKey } from "../scanner.js";
 import { enrich } from "../detector.js";
 import type { Service } from "../types.js";
 
@@ -10,13 +10,14 @@ export function servicesRouter(): Router {
     const services: Service[] = await Promise.all(
       raw.map(async (p) => {
         const det = await enrich(p);
-        return {
+        const svc = {
           ...p,
           label: det.label,
           confidence: det.confidence,
           httpHeaders: det.httpHeaders,
           lastSeen: Date.now(),
         };
+        return { ...svc, groupKey: computeGroupKey(svc) };
       })
     );
     res.json(services);
