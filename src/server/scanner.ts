@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Service } from "./types.js";
 import { enrich } from "./detector.js";
-import { readProcInfo } from "./procinfo.js";
+import { readProcInfo, getParentChain } from "./procinfo.js";
 import { lookup } from "./presets.js";
 
 const execFileAsync = promisify(execFile);
@@ -204,17 +204,21 @@ export class Scanner {
  * `servicePreset` is filled from the presets registry via lookup(port).
  */
 export async function buildService(rawPort: RawPort): Promise<Service> {
-  const det = await enrich(rawPort);
+  const det = await enrich(rawPort, rawPort.cwd);
   const info = await readProcInfo(rawPort.pid);
+  const parentChain = getParentChain(rawPort.pid, 5);
   const base = {
     ...rawPort,
     label: det.label,
     confidence: det.confidence,
     httpHeaders: det.httpHeaders,
+    projectName: det.projectName,
+    httpTitle: det.httpTitle,  // filled in M3
     lastSeen: Date.now(),
     exePath: info.exePath,
     startedAt: info.startedAt,
     ppid: info.ppid,
+    parentChain,
     servicePreset: lookup(rawPort.port) ?? undefined,
   };
   return { ...base, groupKey: computeGroupKey(base) };
