@@ -75,6 +75,11 @@ function applyUpdated(arr) {
 
 function confirmDialog(title, body) {
   return new Promise((resolve) => {
+    if (pendingConfirm) {
+      // Dialog is busy; resolve immediately as cancel to avoid orphaning the prior resolver
+      resolve(false);
+      return;
+    }
     dialogTitle.textContent = title;
     dialogBody.textContent = body;
     pendingConfirm = resolve;

@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import http from "node:http";
 import { findPort } from "./port.js";
 import { Scanner, diff, type RawPort } from "./scanner.js";
-import { WsHub, attachWs, parseClientMessage } from "./ws.js";
+import { WsHub, attachWs } from "./ws.js";
 import { healthRouter } from "./routes/health.js";
 import { servicesRouter } from "./routes/services.js";
 import { killRouter } from "./routes/kill.js";
@@ -12,6 +12,7 @@ import { configRouter } from "./routes/config.js";
 import { presharedRouter } from "./routes/preshared.js";
 import { PresharedManager } from "./preshared.js";
 import { loadConfig, DEFAULT_CONFIG_PATH } from "./config.js";
+import { kill as procKill } from "./proc.js";
 import type { Config, Service } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,7 +31,12 @@ async function main() {
 
   const httpServer = http.createServer(app);
   let currentServices: Service[] = [];
-  const hub = new WsHub(() => ({ type: "snapshot", services: currentServices }));
+  const hub = new WsHub(
+    () => ({ type: "snapshot", services: currentServices }),
+    (msg) => {
+      if (msg.type === "kill-force") procKill(msg.pid);
+    }
+  );
   attachWs(httpServer, hub);
 
   let prevServices: Service[] = [];
@@ -69,16 +75,6 @@ async function main() {
 
   app.use(killRouter(hub, () => prevServices));
   app.use(presharedRouter(preshared));
-
-  // Handle client messages: kill-force after escalation
-  hub.server.on("connection", (ws) => {
-    ws.on("message", (raw) => {
-      const msg = parseClientMessage(raw.toString());
-      if (msg?.type === "kill-force") {
-        import("./proc.js").then(({ kill }) => kill(msg.pid));
-      }
-    });
-  });
 
   httpServer.listen(port, "127.0.0.1", () => {
     console.log(`[localweb] listening on http://127.0.0.1:${port}`);

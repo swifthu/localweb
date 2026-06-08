@@ -6,13 +6,22 @@ export class WsHub {
   private wss: WebSocketServer;
   private clients = new Set<WebSocket>();
 
-  constructor(private getSnapshot?: () => ServerMsg) {
+  constructor(
+    getSnapshot?: () => ServerMsg,
+    onClientMessage?: (msg: ClientMsg, ws: WebSocket) => void
+  ) {
     this.wss = new WebSocketServer({ noServer: true });
     this.wss.on("connection", (ws) => {
       this.clients.add(ws);
-      if (this.getSnapshot) {
-        const snap = this.getSnapshot();
+      if (getSnapshot) {
+        const snap = getSnapshot();
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(snap));
+      }
+      if (onClientMessage) {
+        ws.on("message", (raw) => {
+          const msg = parseClientMessage(raw.toString());
+          if (msg) onClientMessage(msg, ws);
+        });
       }
       ws.on("close", () => this.clients.delete(ws));
     });
