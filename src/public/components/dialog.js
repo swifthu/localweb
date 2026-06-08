@@ -1,28 +1,28 @@
-let dialog, dialogTitle, dialogBody, pendingResolve = null;
+let dialog, dialogTitle, dialogBody;
+let pendingResolvers = [];
 
 export function initDialog() {
   dialog = document.getElementById("confirm-dialog");
   dialogTitle = document.getElementById("confirm-title");
   dialogBody = document.getElementById("confirm-body");
   dialog.addEventListener("close", () => {
-    if (pendingResolve) {
-      const ok = dialog.returnValue === "ok";
-      pendingResolve(ok);
-      pendingResolve = null;
-    }
+    const ok = dialog.returnValue === "ok";
+    const resolvers = pendingResolvers;
+    pendingResolvers = [];
+    for (const r of resolvers) r(ok);
   });
 }
 
 export function confirm(title, body) {
   return new Promise((resolve) => {
-    if (pendingResolve) {
-      // Avoid orphaning the prior resolver
-      resolve(false);
+    if (pendingResolvers.length > 0) {
+      // Dialog is busy: queue this request
+      pendingResolvers.push(resolve);
       return;
     }
+    pendingResolvers.push(resolve);
     dialogTitle.textContent = title;
     dialogBody.textContent = body;
-    pendingResolve = resolve;
     dialog.showModal();
   });
 }

@@ -1,7 +1,7 @@
 import { escapeHtml } from "./utils.js";
+import { state, applyPresharedSnapshot, subscribe } from "../state.js";
 
 let presharedList, presharedEmpty;
-let preshared = new Map();
 
 export function initPreshared() {
   presharedList = document.getElementById("preshared-list");
@@ -21,27 +21,23 @@ export function initPreshared() {
       console.error("preshared action failed", err);
     }
   });
+  subscribe(render);
 }
 
 export async function loadPreshared() {
   try {
     const res = await fetch("/api/preshared");
     const arr = await res.json();
-    preshared = new Map(arr.map((s) => [s.name, s]));
-    render();
+    applyPresharedSnapshot(arr);
   } catch (err) {
     console.error("Failed to load preshared", err);
   }
 }
 
-export function applyUpdate(service) {
-  preshared.set(service.name, service);
-  render();
-}
-
 function render() {
+  if (!presharedList || !presharedEmpty) return;
   presharedList.innerHTML = "";
-  const arr = [...preshared.values()];
+  const arr = [...state.preshared.values()];
   if (arr.length === 0) {
     presharedEmpty.classList.remove("hidden");
     return;

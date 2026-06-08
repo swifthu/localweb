@@ -1,7 +1,7 @@
 import { initThemeToggle, detectInitialTheme } from "./components/theme.js";
 import { initDialog, confirm } from "./components/dialog.js";
 import { initFilters, loadFilter } from "./components/filters.js";
-import { initPreshared, loadPreshared, applyPresharedUpdate } from "./components/preshared.js";
+import { initPreshared, loadPreshared } from "./components/preshared.js";
 import {
   state,
   applySnapshot,
@@ -9,6 +9,7 @@ import {
   applyRemoved,
   applyUpdated,
   applyPresharedSnapshot,
+  applyPresharedUpdate,
   applyFilter,
   subscribe,
 } from "./state.js";
