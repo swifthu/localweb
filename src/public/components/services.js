@@ -35,7 +35,7 @@ function renderServiceCard(svc) {
 
   // Optional sub-lines
   const parentChainLine = svc.parentChain
-    ? `<div class="meta parent-chain">↑ ${escapeHtml(svc.parentChain)}</div>`
+    ? `<div class="meta parent-chain" title="${escapeHtml(svc.parentChain)}">↑ ${escapeHtml(svc.parentChain)}</div>`
     : "";
   const httpTitleLine = svc.httpTitle
     ? `<div class="meta http-title">Title: ${escapeHtml(svc.httpTitle)}</div>`
