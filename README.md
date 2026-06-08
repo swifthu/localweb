@@ -54,6 +54,29 @@ port:
   end: 7899
 ```
 
+## UI Features
+
+- **Dashboard:** Top of the page shows live stats: total services, TCP/UDP count, unique apps, and a "Top apps" pill bar.
+- **Grouping:** Multiple ports from the same executable (e.g. `python3 -m http.server` on 3 ports) are automatically grouped under a single collapsible card. Click to expand.
+- **Search:** Type in the search box to filter by label, command, exe path, or port number.
+- **Dark/Light theme:** Click the ☾/☀ button in the top-right. Choice is persisted to localStorage and respects your system preference on first visit.
+
+## New `Service` fields (v0.2)
+
+| Field | Description | Example |
+|---|---|---|
+| `exePath` | Absolute path to the executable (Linux: `/proc/<pid>/exe`; macOS: `lsof -d txt`) | `/Applications/Spotify.app/Contents/MacOS/Spotify` |
+| `startedAt` | Epoch ms when the process started | `1717862400000` |
+| `ppid` | Parent process ID | `1` |
+| `servicePreset` | Match against built-in port presets (e.g. 5432 → PostgreSQL) | `{ name: "PostgreSQL", icon: "elephant", color: "#336791" }` |
+| `groupKey` | Group identifier (default: basename of exePath) | `Spotify` |
+
+These fields are additive — v0.1 clients that only read the 11 original fields keep working.
+
+## Built-in port presets (v0.2)
+
+About 30 common ports are recognized: databases (PostgreSQL, MySQL, Redis, MongoDB, etc.), dev servers (Vite, Angular, Python http.server), proxies, mail, container/orchestration. See `src/server/presets.ts` for the full list.
+
 ## Requirements
 
 - Node 20+
