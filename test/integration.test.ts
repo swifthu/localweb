@@ -233,3 +233,44 @@ describe("M5 preshared", () => {
     }
   }, 20000);
 });
+
+describe("M1 v0.2 deep collection", () => {
+  it("/api/services entries include exePath, startedAt, groupKey", async () => {
+    const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
+    const arr = (await res.json()) as Array<{
+      port: number;
+      pid: number;
+      exePath?: string;
+      startedAt?: number;
+      groupKey: string;
+    }>;
+    expect(arr.length).toBeGreaterThan(0);
+    for (const s of arr) {
+      expect(s.groupKey).toBeTypeOf("string");
+      expect(s.groupKey.length).toBeGreaterThan(0);
+      // exePath and startedAt are best-effort; may be undefined on permission failures
+    }
+  });
+
+  it("two python http.server processes share the same groupKey", async () => {
+    const p1 = 19900 + Math.floor(Math.random() * 50);
+    const p2 = 19960 + Math.floor(Math.random() * 30);
+    const c1 = spawn("python3", ["-m", "http.server", String(p1)], { stdio: "ignore" });
+    const c2 = spawn("python3", ["-m", "http.server", String(p2)], { stdio: "ignore" });
+    try {
+      // Wait for both to bind and scanner to pick up
+      await wait(5000);
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
+      const arr = (await res.json()) as Array<{ port: number; groupKey: string }>;
+      const s1 = arr.find((s) => s.port === p1);
+      const s2 = arr.find((s) => s.port === p2);
+      expect(s1).toBeDefined();
+      expect(s2).toBeDefined();
+      expect(s1!.groupKey).toBe(s2!.groupKey);
+    } finally {
+      c1.kill("SIGKILL");
+      c2.kill("SIGKILL");
+      await wait(300);
+    }
+  }, 15000);
+});
