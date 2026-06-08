@@ -35,7 +35,9 @@ async function main() {
 
   let prevServices: Service[] = [];
   let config: Config = await loadConfig(configPath);
-  const preshared = new PresharedManager();
+  const preshared = new PresharedManager((svc) => {
+    hub.broadcast({ type: "preshared-update", service: svc });
+  });
   preshared.loadSpecs(config.preshared);
   const scanner = new Scanner((next) => {
     const filtered = next.filter((s) =>
@@ -66,7 +68,7 @@ async function main() {
   }, 5000);
 
   app.use(killRouter(hub, () => prevServices));
-  app.use(presharedRouter(preshared, hub));
+  app.use(presharedRouter(preshared));
 
   // Handle client messages: kill-force after escalation
   hub.server.on("connection", (ws) => {

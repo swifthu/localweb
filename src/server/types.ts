@@ -21,6 +21,7 @@ export interface Preshared {
   pid?: number;
   startedAt?: number;
   exitCode?: number;
+  lastError?: string;
 }
 
 export interface PresharedSpec {
