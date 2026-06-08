@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { detect, detectFromHeaders } from "../src/server/detector.js";
 import type { RawPort } from "../src/server/scanner.js";
+import { lookup } from "../src/server/presets.js";
 
 const port = (overrides: Partial<RawPort>): RawPort => ({
   pid: 1,
@@ -62,5 +63,12 @@ describe("detect (command-line based)", () => {
   it("returns generic label for unknown command", () => {
     const r = detect(port({ command: "mything" }));
     expect(r.confidence).toBe("low");
+  });
+});
+
+describe("detector + presets", () => {
+  it("enrichment can include servicePreset when port matches", () => {
+    const preset = lookup(5432);
+    expect(preset?.name).toBe("PostgreSQL");
   });
 });

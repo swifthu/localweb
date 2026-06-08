@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import type { Service } from "./types.js";
 import { enrich } from "./detector.js";
 import { readProcInfo } from "./procinfo.js";
+import { lookup } from "./presets.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -216,6 +217,7 @@ export async function buildService(rawPort: RawPort): Promise<Service> {
     exePath: info.exePath,
     startedAt: info.startedAt,
     ppid: info.ppid,
+    servicePreset: lookup(rawPort.port) ?? undefined,
   };
   return { ...base, groupKey: computeGroupKey(base) };
 }
