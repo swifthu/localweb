@@ -18,8 +18,11 @@ function renderServiceCard(svc) {
   const li = document.createElement("li");
   li.className = "service";
   li.dataset.pid = String(svc.pid);
-  const host = svc.address === "0.0.0.0" || svc.address === "::" ? "localhost" : svc.address;
-  const url = `http://${host}:${svc.port}`;
+  // Use the browser's current host (location.host = "hostname:port")
+  // so the link works whether the user is on localhost or on a LAN IP.
+  // Fall back to svc.address if location.host is somehow unavailable.
+  const host = location.host || `${svc.address}:${location.port || ""}`;
+  const url = `http://${host.split(":")[0]}:${svc.port}`;
   const presetBadge = svc.servicePreset
     ? `<span class="preset" style="background:${escapeHtml(svc.servicePreset.color)}22; color:${escapeHtml(svc.servicePreset.color)};">${escapeHtml(svc.servicePreset.name)}</span>`
     : "";
@@ -31,9 +34,9 @@ function renderServiceCard(svc) {
       ${svc.exePath ? `<div class="meta" style="font-size: 11px;">${escapeHtml(svc.exePath)}</div>` : ""}
     </div>
     <div class="actions">
-      <a href="${escapeHtml(url)}" target="_blank" rel="noopener">Open</a>
-      <button data-action="copy" data-url="${escapeHtml(url)}">Copy URL</button>
-      <button data-action="kill" data-pid="${svc.pid}">Kill</button>
+      <a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">Open</a>
+      <button class="btn" data-action="copy" data-url="${escapeHtml(url)}">Copy URL</button>
+      <button class="btn" data-action="kill" data-pid="${svc.pid}">Kill</button>
     </div>
   `;
   return li;
