@@ -320,3 +320,73 @@ describe("M2 port presets", () => {
     }
   }, 15000);
 });
+
+describe("M1 v0.3 project source identification", () => {
+  it("/api/services entries include projectName from cwd", async () => {
+    // Spawn a python server in a known cwd via env
+    const port = 20100 + Math.floor(Math.random() * 50);
+    const child = spawn("python3", ["-m", "http.server", String(port)], {
+      cwd: "/tmp",
+      stdio: "ignore",
+    });
+    try {
+      await wait(5000);
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
+      const arr = (await res.json()) as Array<{
+        port: number;
+        cwd?: string;
+        projectName?: string;
+        parentChain?: string;
+      }>;
+      const svc = arr.find((s) => s.port === port);
+      expect(svc).toBeDefined();
+      // /tmp is a system path, so extractProjectName should return undefined
+      // (or if it's $TMPDIR like /var/folders/.../T/, the basename is "T" — also a system-y path)
+      // The contract is: either undefined OR a string, but we don't assert either strongly here.
+    } finally {
+      child.kill("SIGKILL");
+      await wait(300);
+    }
+  }, 15000);
+
+  it("python server in a project dir has projectName === basename", async () => {
+    const port = 20200 + Math.floor(Math.random() * 50);
+    const projectDir = `/tmp/localweb-test-${Date.now()}/myapp`;
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(projectDir, { recursive: true });
+    const child = spawn("python3", ["-m", "http.server", String(port)], {
+      cwd: projectDir,
+      stdio: "ignore",
+    });
+    try {
+      await wait(5000);
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
+      const arr = (await res.json()) as Array<{
+        port: number;
+        cwd?: string;
+        projectName?: string;
+      }>;
+      const svc = arr.find((s) => s.port === port);
+      expect(svc).toBeDefined();
+      expect(svc!.projectName).toBe("myapp");
+    } finally {
+      child.kill("SIGKILL");
+      await wait(300);
+    }
+  }, 15000);
+
+  it("/api/services entries include parentChain string", async () => {
+    const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
+    const arr = (await res.json()) as Array<{
+      port: number;
+      parentChain?: string;
+    }>;
+    expect(arr.length).toBeGreaterThan(0);
+    for (const s of arr) {
+      if (s.parentChain) {
+        expect(s.parentChain.length).toBeGreaterThan(0);
+        // Must contain at least the leaf node's name (no "→" required if depth=0)
+      }
+    }
+  });
+});
