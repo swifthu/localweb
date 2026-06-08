@@ -5,7 +5,6 @@ export const state = {
   services: new Map(), // pid → Service
   preshared: new Map(), // name → Preshared
   filter: { tcp: true, udp: false, search: "" },
-  groupByExe: true,
   theme: "dark",
 };
 

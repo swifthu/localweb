@@ -14,7 +14,7 @@ import {
   subscribe,
 } from "./state.js";
 import { renderDashboard } from "./components/dashboard.js";
-import { renderServices } from "./components/services.js";
+import { renderServices, initServices } from "./components/services.js";
 
 const banner = document.getElementById("banner");
 let ws = null;
@@ -112,6 +112,7 @@ initThemeToggle(document.getElementById("theme-toggle"));
 initDialog();
 initFilters();
 initPreshared();
+initServices();
 loadFilter();
 loadSnapshot().then(connectWs);
 
