@@ -9,9 +9,23 @@ export function configRouter(getConfigPath: () => string): Router {
     res.json(c);
   });
   r.put("/api/config", async (req, res) => {
-    const body = req.body as Partial<Config>;
-    if (!body || typeof body !== "object") {
-      return res.status(400).json({ error: "invalid body" });
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return res.status(400).json({ error: "body must be an object" });
+    }
+    if (body.protocolFilter !== undefined) {
+      const pf = body.protocolFilter;
+      if (
+        !pf ||
+        typeof pf !== "object" ||
+        Array.isArray(pf) ||
+        typeof pf.tcp !== "boolean" ||
+        typeof pf.udp !== "boolean"
+      ) {
+        return res.status(400).json({
+          error: "protocolFilter must be { tcp: boolean, udp: boolean }",
+        });
+      }
     }
     const current = await loadConfig(getConfigPath());
     const next: Config = { ...current, ...body };

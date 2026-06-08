@@ -48,4 +48,10 @@ describe("config", () => {
     const files = await fs.readdir(dir);
     expect(files).toEqual(["config.yaml"]);
   });
+
+  it("throws on malformed YAML with friendly message", async () => {
+    // Bad indent + tab — guaranteed to trip js-yaml
+    writeFileSync(path, "protocolFilter:\n\t  tcp: : false\n  : :\n");
+    await expect(loadConfig(path)).rejects.toThrow(/line|col/);
+  });
 });
