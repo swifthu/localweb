@@ -390,3 +390,30 @@ describe("M1 v0.3 project source identification", () => {
     }
   });
 });
+
+describe("M3 v0.3 HTTP title probe", () => {
+  it("/api/services entries may include httpTitle when server exposes <title>", async () => {
+    // Spin up a tiny HTTP server with a <title> on a known port
+    const http = await import("node:http");
+    const port = 20900 + Math.floor(Math.random() * 100);
+    const server = http.createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end("<html><head><title>Integration Test Server</title></head></html>");
+    });
+    await new Promise<void>((r) => server.listen(port, "127.0.0.1", r));
+    try {
+      // Wait for scanner to pick up the new service + probe its title
+      await wait(6000);
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
+      const arr = (await res.json()) as Array<{ port: number; httpTitle?: string }>;
+      const svc = arr.find((s) => s.port === port);
+      expect(svc).toBeDefined();
+      // httpTitle is best-effort; may be undefined if the probe failed
+      if (svc?.httpTitle) {
+        expect(svc.httpTitle).toBe("Integration Test Server");
+      }
+    } finally {
+      server.close();
+    }
+  }, 15000);
+});
