@@ -49,6 +49,7 @@ function render() {
       </div>
       <div class="actions">
         <a href="${url}" target="_blank" rel="noopener">Open</a>
+        <button data-action="copy" data-url="${url}">Copy URL</button>
         <button data-action="kill" data-pid="${svc.pid}">Kill</button>
       </div>
     `;
@@ -98,7 +99,16 @@ dialog.addEventListener("close", () => {
 list.addEventListener("click", async (ev) => {
   const target = ev.target;
   if (!(target instanceof HTMLElement)) return;
-  if (target.dataset.action === "kill") {
+  if (target.dataset.action === "copy") {
+    const url = target.dataset.url;
+    try {
+      await navigator.clipboard.writeText(url);
+      target.textContent = "Copied!";
+      setTimeout(() => (target.textContent = "Copy URL"), 1000);
+    } catch (err) {
+      showBanner(`Copy failed: ${err.message}`);
+    }
+  } else if (target.dataset.action === "kill") {
     const pid = Number(target.dataset.pid);
     const svc = services.get(pid);
     if (!svc) return;
