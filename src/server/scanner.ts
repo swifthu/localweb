@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Service } from "./types.js";
 import { enrich } from "./detector.js";
-import { readProcInfo, getParentChain } from "./procinfo.js";
+import { readProcInfo, getParentChain, getParentChainAsync } from "./procinfo.js";
 import { lookup } from "./presets.js";
 
 const execFileAsync = promisify(execFile);
@@ -190,6 +190,10 @@ export class Scanner {
 
   private async tick(): Promise<void> {
     const raw = await runLsof();
+    // Pre-warm the parent chain for every PID so buildService (sync) reads
+    // a populated value. Otherwise the first tick would broadcast
+    // parentChain: undefined for every port.
+    await Promise.all(raw.map((p) => getParentChainAsync(p.pid, 5)));
     const services: Service[] = await Promise.all(raw.map(buildService));
     this.prev = services;
     this.onUpdate(services);
@@ -201,6 +205,9 @@ export class Scanner {
  * Scanner.tick() and the on-demand /api/services route so the two produce
  * identical output. Awaits procinfo fill (one-shot per PID) so exePath /
  * startedAt / ppid are populated on the very first call after PID discovery.
+ * `parentChain` is read from the per-PID cache, which the scanner tick
+ * pre-warms via getParentChainAsync; callers that hit this directly (e.g.
+ * /api/services) may briefly see undefined until the async fill resolves.
  * `servicePreset` is filled from the presets registry via lookup(port).
  */
 export async function buildService(rawPort: RawPort): Promise<Service> {

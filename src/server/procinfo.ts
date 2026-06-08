@@ -8,6 +8,7 @@ interface ProcInfo {
   exePath?: string;
   startedAt?: number;
   ppid?: number;
+  parentChain?: string;
 }
 
 export type { ProcInfo };
@@ -146,7 +147,13 @@ export async function getParentChainAsync(pid: number, maxDepth = 5): Promise<st
     if (ppid === undefined || ppid <= 1) break;
     current = ppid;
   }
-  return names.join(" → ");
+  const chain = names.join(" → ");
+  // Persist the chain on the original PID's procinfo entry so the sync
+  // getParentChain() can read it from the same per-PID cache.
+  const cached = cache.get(pid) ?? {};
+  cached.parentChain = chain;
+  cache.set(pid, cached);
+  return chain;
 }
 
 async function readCommand(pid: number): Promise<string | undefined> {
@@ -168,14 +175,15 @@ async function readCommand(pid: number): Promise<string | undefined> {
 }
 
 // Sync wrapper for the existing buildService() pipeline
-// (matches the fire-and-forget pattern of readExePath/readStartTime/readPpid)
-let _chainCache: { pid: number; chain: string | undefined } | null = null;
+// (matches the fire-and-forget pattern of readExePath/readStartTime/readPpid).
+// Reads parentChain from the per-PID ProcInfo cache populated by
+// getParentChainAsync(), so the value is preserved across calls for all
+// PIDs (not just the most recent one).
 export function getParentChain(pid: number, maxDepth = 5): string | undefined {
-  if (_chainCache && _chainCache.pid === pid) return _chainCache.chain;
-  // Kick off async fill; first call returns undefined
-  void (async () => {
-    const chain = await getParentChainAsync(pid, maxDepth);
-    _chainCache = { pid, chain };
-  })();
-  return undefined;
+  if (!cache.has(pid)) {
+    // Kick off async fill; first call returns undefined
+    void getParentChainAsync(pid, maxDepth);
+    return undefined;
+  }
+  return cache.get(pid)!.parentChain;
 }
