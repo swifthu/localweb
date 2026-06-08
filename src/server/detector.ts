@@ -113,15 +113,22 @@ export async function probeHttp(
 
 export async function enrich(raw: RawPort, cwd?: string): Promise<Detection> {
   const d = detect(raw, undefined, cwd);
-  if (raw.protocol !== "tcp") return d;
-  const headers = await probeHttp(raw.address, raw.port);
-  if (!headers) return d;
-  const fromHeader = detectFromHeaders(headers);
-  // If header is high-confidence, prefer it; otherwise keep command-line result.
-  if (fromHeader.confidence === "high") {
-    return { ...fromHeader, projectName: d.projectName, httpHeaders: headers };
+  if (raw.protocol === "tcp") {
+    const headers = await probeHttp(raw.address, raw.port);
+    if (headers) {
+      const fromHeader = detectFromHeaders(headers);
+      if (fromHeader.confidence === "high") {
+        // Header-based identification takes precedence
+        d.label = fromHeader.label;
+        d.confidence = "high";
+      }
+      d.httpHeaders = headers;
+    }
+    // v0.3: also probe for <title> (independent of headers)
+    const title = await probeHttpTitle(raw.address, raw.port);
+    if (title) d.httpTitle = title;
   }
-  return { ...d, httpHeaders: headers, confidence: d.confidence };
+  return d;
 }
 
 // Cache by (address, port) to avoid re-probing on every scanner tick
