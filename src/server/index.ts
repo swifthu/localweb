@@ -12,15 +12,40 @@ import { configRouter } from "./routes/config.js";
 import { presharedRouter } from "./routes/preshared.js";
 import { PresharedManager } from "./preshared.js";
 import { loadConfig, DEFAULT_CONFIG_PATH } from "./config.js";
+import { expandHome } from "./paths.js";
 import { kill as procKill } from "./proc.js";
 import type { Config, Service } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
 
+interface CliArgs {
+  port?: number;
+  noPreshared: boolean;
+  configPath: string;
+}
+function parseArgs(argv: string[]): CliArgs {
+  const out: CliArgs = {
+    noPreshared: false,
+    configPath: DEFAULT_CONFIG_PATH,
+  };
+  for (let i = 2; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--port") out.port = Number(argv[++i]);
+    else if (a === "--no-preshared") out.noPreshared = true;
+    else if (a === "--config") out.configPath = expandHome(argv[++i]);
+    else if (a === "--help" || a === "-h") {
+      console.log(`localweb [--port N] [--no-preshared] [--config PATH]`);
+      process.exit(0);
+    }
+  }
+  return out;
+}
+
 async function main() {
-  const port = await findPort(7878, 7899);
-  const configPath = DEFAULT_CONFIG_PATH;
+  const args = parseArgs(process.argv);
+  const port = args.port ?? (await findPort(7878, 7899));
+  const configPath = args.configPath;
   const app = express();
   app.use(express.json());
   app.use("/static", express.static(publicDir));
@@ -44,7 +69,9 @@ async function main() {
   const preshared = new PresharedManager((svc) => {
     hub.broadcast({ type: "preshared-update", service: svc });
   });
-  preshared.loadSpecs(config.preshared);
+  if (!args.noPreshared) {
+    preshared.loadSpecs(config.preshared);
+  }
   const scanner = new Scanner((next) => {
     const filtered = next.filter((s) =>
       s.protocol === "tcp" ? config.protocolFilter.tcp : config.protocolFilter.udp
@@ -59,7 +86,9 @@ async function main() {
     }
   });
   scanner.start();
-  await preshared.autostartAll();
+  if (!args.noPreshared) {
+    await preshared.autostartAll();
+  }
 
   // Periodically reload config (cheap, every 5s) to pick up UI changes
   setInterval(async () => {
