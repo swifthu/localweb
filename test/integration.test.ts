@@ -312,9 +312,8 @@ describe("M2 port presets", () => {
       // If a real Postgres happens to own 5432 on the test machine, the test still passes
       // (the servicePreset would point to the actual owner, which is correct behavior).
       expect(svc).toBeDefined();
-      if (svc?.servicePreset) {
-        expect(svc.servicePreset.name).toBe("PostgreSQL");
-      }
+      expect(svc!.servicePreset).toBeDefined();
+      expect(svc!.servicePreset!.name).toBe("PostgreSQL");
     } finally {
       child.kill("SIGKILL");
       await wait(300);

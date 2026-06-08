@@ -13,8 +13,8 @@ export const BUILTIN_PRESETS: Record<number, Preset> = {
   9200: { name: "Elasticsearch", icon: "search", color: "#f9b934" },
   5601: { name: "Kibana", icon: "chart", color: "#e8478d" },
   // Dev servers
-  3000: { name: "Node dev", icon: "node", color: "#43853d" },
-  3001: { name: "Node dev", icon: "node", color: "#43853d" },
+  3000: { name: "Vite dev", icon: "vite", color: "#646cff" },
+  3001: { name: "Vite dev", icon: "vite", color: "#646cff" },
   4200: { name: "Angular dev", icon: "angular", color: "#dd0031" },
   5173: { name: "Vite dev", icon: "vite", color: "#646cff" },
   8000: { name: "Python dev", icon: "python", color: "#3776ab" },

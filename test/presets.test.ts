@@ -10,7 +10,8 @@ describe("presets", () => {
   });
 
   it("lookup returns preset for dev server ports", () => {
-    expect(lookup(3000)?.name).toMatch(/Vite|Node/i);
+    expect(lookup(3000)?.name).toBe("Vite dev");
+    expect(lookup(3001)?.name).toBe("Vite dev");
     expect(lookup(5173)?.name).toBe("Vite dev");
     expect(lookup(8080)?.name).toMatch(/HTTP/i);
   });

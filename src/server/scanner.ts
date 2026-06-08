@@ -201,9 +201,7 @@ export class Scanner {
  * Scanner.tick() and the on-demand /api/services route so the two produce
  * identical output. Awaits procinfo fill (one-shot per PID) so exePath /
  * startedAt / ppid are populated on the very first call after PID discovery.
- *
- * `servicePreset` is left undefined here; M2 will fill it from a presets
- * registry via lookup(port).
+ * `servicePreset` is filled from the presets registry via lookup(port).
  */
 export async function buildService(rawPort: RawPort): Promise<Service> {
   const det = await enrich(rawPort);
