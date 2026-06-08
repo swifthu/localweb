@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Service } from "./types.js";
+import { enrich } from "./detector.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -149,4 +150,59 @@ export function diff(prev: Service[], next: Service[]): DiffResult {
   }
 
   return { added, removed, updated };
+}
+
+export class Scanner {
+  private prev: Service[] = [];
+  private timer: NodeJS.Timeout | null = null;
+  private cmdlineCache = new Map<number, string>();
+
+  constructor(
+    private onUpdate: (services: Service[]) => void,
+    private intervalMs = 2000
+  ) {}
+
+  start(): void {
+    if (this.timer) return;
+    void this.tick();
+    this.timer = setInterval(() => void this.tick(), this.intervalMs);
+  }
+
+  stop(): void {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+  }
+
+  private async tick(): Promise<void> {
+    const raw = await runLsof();
+    // Fetch full command line for each new pid (best effort)
+    for (const p of raw) {
+      if (!this.cmdlineCache.has(p.pid)) {
+        this.cmdlineCache.set(p.pid, await readCmdline(p.pid));
+      }
+    }
+    const services: Service[] = await Promise.all(
+      raw.map(async (p) => {
+        const det = await enrich(p);
+        return {
+          ...p,
+          label: det.label,
+          confidence: det.confidence,
+          httpHeaders: det.httpHeaders,
+          lastSeen: Date.now(),
+        };
+      })
+    );
+    this.prev = services;
+    this.onUpdate(services);
+  }
+}
+
+async function readCmdline(pid: number): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync("ps", ["-o", "command=", "-p", String(pid)]);
+    return stdout.trim();
+  } catch {
+    return "";
+  }
 }
