@@ -1,32 +1,48 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>localweb</title>
+    <link rel="stylesheet" href="/static/theme.css" />
     <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
     <header>
-      <h1>localweb</h1>
-      <div id="banner" class="banner hidden"></div>
+      <div class="brand">
+        <h1>localweb</h1>
+        <span class="subtitle">local dev services</span>
+      </div>
+      <button id="theme-toggle" aria-label="Toggle theme">☾</button>
     </header>
     <main>
+      <section id="dashboard-section">
+        <div id="dashboard-grid"><!-- dashboard.js renders here --></div>
+      </section>
       <section id="services-section">
-        <div id="filter-bar">
-          <label><input type="checkbox" id="filter-tcp" checked /> TCP</label>
-          <label><input type="checkbox" id="filter-udp" /> UDP</label>
+        <div class="section-bar">
+          <h2>Services</h2>
+          <div class="section-bar-right">
+            <input id="search-input" type="search" placeholder="Search…" />
+            <div id="filter-bar">
+              <label><input type="checkbox" id="filter-tcp" checked /> TCP</label>
+              <label><input type="checkbox" id="filter-udp" /> UDP</label>
+            </div>
+            <button id="refresh-btn">Refresh</button>
+          </div>
         </div>
-        <h2>Active services <button id="refresh-btn">Refresh</button></h2>
         <ul id="services-list"></ul>
         <p id="empty-state" class="hidden">No LISTEN ports detected.</p>
       </section>
       <section id="preshared-section">
-        <h2>Pre-shared services</h2>
+        <div class="section-bar">
+          <h2>Pre-shared services</h2>
+        </div>
         <ul id="preshared-list"></ul>
-        <p id="preshared-empty" class="hidden">No pre-shared services configured. Add `preshared:` entries to <code>~/.config/localweb/config.yaml</code>.</p>
+        <p id="preshared-empty" class="hidden">No pre-shared services configured.</p>
       </section>
     </main>
+    <div id="banner" class="banner hidden"></div>
     <dialog id="confirm-dialog">
       <form method="dialog">
         <h3 id="confirm-title">Confirm</h3>
