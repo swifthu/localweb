@@ -27,11 +27,27 @@ function renderServiceCard(svc) {
     ? `<span class="preset" style="background:${escapeHtml(svc.servicePreset.color)}22; color:${escapeHtml(svc.servicePreset.color)};">${escapeHtml(svc.servicePreset.name)}</span>`
     : "";
   const startedAgo = svc.startedAt ? formatAgo(svc.startedAt) : "";
+
+  // Main line: "Node · myapp" (with preset badge + confidence)
+  const mainLine = svc.projectName
+    ? `${escapeHtml(svc.label)} · <strong>${escapeHtml(svc.projectName)}</strong>`
+    : escapeHtml(svc.label);
+
+  // Optional sub-lines
+  const parentChainLine = svc.parentChain
+    ? `<div class="meta parent-chain">↑ ${escapeHtml(svc.parentChain)}</div>`
+    : "";
+  const httpTitleLine = svc.httpTitle
+    ? `<div class="meta http-title">Title: ${escapeHtml(svc.httpTitle)}</div>`
+    : "";
+
   li.innerHTML = `
     <div>
-      <div class="label">${escapeHtml(svc.label)} ${presetBadge} <span class="confidence-${svc.confidence}">· ${svc.confidence}</span></div>
+      <div class="label">${mainLine} ${presetBadge} <span class="confidence-${svc.confidence}">· ${svc.confidence}</span></div>
       <div class="meta">pid ${svc.pid} · ${escapeHtml(svc.command)} · ${escapeHtml(svc.address)}:${svc.port}${startedAgo ? ` · started ${escapeHtml(startedAgo)}` : ""}</div>
       ${svc.exePath ? `<div class="meta" style="font-size: 11px;">${escapeHtml(svc.exePath)}</div>` : ""}
+      ${parentChainLine}
+      ${httpTitleLine}
     </div>
     <div class="actions">
       <a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">Open</a>

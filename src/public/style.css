@@ -173,6 +173,17 @@ li.service .label .preset {
 .status-stopped { color: var(--fg-muted); }
 .status-failed { color: var(--danger); }
 .actions { display: flex; gap: 6px; }
+.service .meta.parent-chain {
+  color: var(--accent);
+  font-size: 12px;
+  margin-top: 2px;
+}
+.service .meta.http-title {
+  color: var(--fg-muted);
+  font-style: italic;
+  font-size: 12px;
+  margin-top: 2px;
+}
 
 .banner {
   position: fixed;
