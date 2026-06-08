@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
 import { WebSocket } from "ws";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -189,4 +189,41 @@ describe("M4 config", () => {
     expect(cfg.protocolFilter.tcp).toBe(false);
     expect(cfg.protocolFilter.udp).toBe(true);
   });
+});
+
+describe("M5 preshared", () => {
+  // The Task 28 test depends on Task 30's --port flag (M6). Skip until M6
+  // lands. To re-enable: change `skipIf(true)` to `skipIf(false)` (or remove
+  // the guard) once `node dist/server/index.js --port N` is supported.
+  it.skipIf(true)("auto-spawns configured services on a fresh server with isolated config", async () => {
+    // Write a config to a temp dir and spawn a NEW localweb with HOME
+    // pointed at it (so the default config path resolves inside the temp dir).
+    // We do not mutate the test process's HOME — only the child sees it.
+    const cfgDir = join(tmpdir(), `localweb-it-${Date.now()}`);
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(join(cfgDir, ".config", "localweb"), { recursive: true });
+    const cfgPath = join(cfgDir, ".config", "localweb", "config.yaml");
+    writeFileSync(
+      cfgPath,
+      "protocolFilter:\n  tcp: true\n  udp: false\npreshared:\n  - name: sleep-svc\n    cmd: 'node -e \"setInterval(()=>{},1000)\"'\nport:\n  start: 7878\n  end: 7899\n"
+    );
+
+    // Use a different starting port so we don't collide with the shared server
+    // started in beforeAll. We rely on --port being available from Task 30;
+    // for the order-dependent path, run this test only after M6.
+    const child = spawn("node", ["dist/server/index.js", "--port", "7878"], {
+      env: { ...process.env, HOME: cfgDir },
+      stdio: "ignore",
+    });
+    await wait(2000);
+
+    const res = await fetch(`http://127.0.0.1:7878/api/preshared`);
+    const arr = (await res.json()) as Array<{ name: string; status: string }>;
+    const found = arr.find((s) => s.name === "sleep-svc");
+    expect(found).toBeDefined();
+    expect(found?.status).toBe("running");
+
+    child.kill("SIGTERM");
+    await wait(500);
+  }, 20000);
 });
