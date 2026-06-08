@@ -124,6 +124,43 @@ export async function enrich(raw: RawPort, cwd?: string): Promise<Detection> {
   return { ...d, httpHeaders: headers, confidence: d.confidence };
 }
 
+// Cache by (address, port) to avoid re-probing on every scanner tick
+const _titleCache = new Map<string, { value: string | undefined; ts: number }>();
+const TITLE_CACHE_TTL_MS = 30_000;
+
+export async function probeHttpTitle(
+  address: string,
+  port: number,
+  timeoutMs = 1000
+): Promise<string | undefined> {
+  const host = address === "0.0.0.0" || address === "::" ? "127.0.0.1" : address;
+  const key = `${host}:${port}`;
+  const cached = _titleCache.get(key);
+  if (cached && Date.now() - cached.ts < TITLE_CACHE_TTL_MS) {
+    return cached.value;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`http://${host}:${port}/`, { signal: controller.signal });
+    if (!res.ok) {
+      _titleCache.set(key, { value: undefined, ts: Date.now() });
+      return undefined;
+    }
+    const text = await res.text();
+    const match = text.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const title = match ? match[1].trim() : undefined;
+    _titleCache.set(key, { value: title, ts: Date.now() });
+    return title;
+  } catch {
+    _titleCache.set(key, { value: undefined, ts: Date.now() });
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const SYSTEM_CWD_PREFIXES = [
   "/usr/libexec",
   "/usr/bin",
