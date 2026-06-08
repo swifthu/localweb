@@ -127,3 +127,55 @@ export function readPpid(pid: number): number | undefined {
   }
   return cache.get(pid)!.ppid;
 }
+
+export async function getParentChainAsync(pid: number, maxDepth = 5): Promise<string | undefined> {
+  // Walk up the PPID chain, collecting command names.
+  // Cache-aware: reuses the same readPpid + readCommand as the rest of procinfo.
+  const seen = new Set<number>();
+  const names: string[] = [];
+  let current = pid;
+  for (let i = 0; i < maxDepth; i++) {
+    if (seen.has(current)) break;
+    seen.add(current);
+    // Make sure procinfo cache is filled for this PID so readPpid is populated
+    await readProcInfo(current);
+    const cmd = await readCommand(current);
+    const ppid = readPpid(current);
+    if (cmd === undefined && ppid === undefined) return undefined; // no info
+    names.push(cmd || "?");
+    if (ppid === undefined || ppid <= 1) break;
+    current = ppid;
+  }
+  return names.join(" → ");
+}
+
+async function readCommand(pid: number): Promise<string | undefined> {
+  try {
+    if (isLinux()) {
+      const text = await readFile(`/proc/${pid}/comm`, "utf8");
+      return text.trim();
+    } else if (isMac()) {
+      const { stdout } = await execFileAsync("ps", [
+        "-o", "comm=", "-p", String(pid),
+      ]);
+      const trimmed = stdout.trim();
+      return trimmed || undefined;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+// Sync wrapper for the existing buildService() pipeline
+// (matches the fire-and-forget pattern of readExePath/readStartTime/readPpid)
+let _chainCache: { pid: number; chain: string | undefined } | null = null;
+export function getParentChain(pid: number, maxDepth = 5): string | undefined {
+  if (_chainCache && _chainCache.pid === pid) return _chainCache.chain;
+  // Kick off async fill; first call returns undefined
+  void (async () => {
+    const chain = await getParentChainAsync(pid, maxDepth);
+    _chainCache = { pid, chain };
+  })();
+  return undefined;
+}
