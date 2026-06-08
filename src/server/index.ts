@@ -14,7 +14,7 @@ async function main() {
   app.use(express.json());
   app.use("/static", express.static(publicDir));
   app.get("/", (_req, res) => res.sendFile(join(publicDir, "index.html")));
-  app.use(healthRouter());
+  app.use(healthRouter(port));
   app.use(servicesRouter());
 
   app.listen(port, "127.0.0.1", () => {

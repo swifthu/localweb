@@ -46,4 +46,12 @@ describe("M1 integration", () => {
     const html = await res.text();
     expect(html).toContain("<title>localweb</title>");
   });
+
+  it("/api/health returns ok and the actual listen port", async () => {
+    const res = await fetch(`http://127.0.0.1:${serverPort}/api/health`);
+    expect(res.ok).toBe(true);
+    const body = (await res.json()) as { ok: boolean; port: number };
+    expect(body.ok).toBe(true);
+    expect(body.port).toBe(serverPort);
+  });
 });

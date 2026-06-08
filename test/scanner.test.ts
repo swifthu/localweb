@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { parseLsof, diff } from "../src/server/scanner.js";
+import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
+import { setTimeout as wait } from "node:timers/promises";
+import { parseLsof, diff, readCwd, type RawPort } from "../src/server/scanner.js";
 import type { Service } from "../src/server/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -92,3 +95,36 @@ describe("diff", () => {
     expect(d.updated[0].label).toBe("Vite dev server");
   });
 });
+
+describe("readCwd", () => {
+  it("returns the cwd of a running child process", async () => {
+    const cwd = realpathSync(tmpdir());
+    const child = spawn("node", ["-e", "setTimeout(() => {}, 5000)"], { cwd });
+    try {
+      expect(child.pid).toBeDefined();
+      // lsof may briefly not have the new process indexed; a small wait is safe.
+      const result = await waitForCwd(child.pid!, cwd);
+      expect(result).toBe(cwd);
+    } finally {
+      child.kill();
+    }
+  }, 10000);
+
+  it("returns undefined for a non-existent pid", async () => {
+    const result = await readCwd(2_000_000_000);
+    expect(result).toBeUndefined();
+  });
+});
+
+async function waitForCwd(
+  pid: number,
+  expected: string,
+  attempts = 20
+): Promise<string | undefined> {
+  for (let i = 0; i < attempts; i++) {
+    const cwd = await readCwd(pid);
+    if (cwd === expected) return cwd;
+    await wait(50);
+  }
+  return readCwd(pid);
+}

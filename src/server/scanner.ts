@@ -10,6 +10,7 @@ export interface RawPort {
   protocol: "tcp" | "udp";
   address: string;
   command: string;
+  cwd?: string;
   user: string;
 }
 
@@ -49,17 +50,72 @@ function parseLine(line: string): RawPort | null {
   return { pid, port, protocol: "tcp", address, command, user };
 }
 
+const cwdCache = new Map<number, string | undefined>();
+
+/**
+ * Read the current working directory of a process via `lsof -a -d cwd -p <pid>`.
+ * Works on macOS and Linux (BSD ps has no `cwd` keyword, so we use lsof here
+ * even though the main lsof call doesn't include cwd to keep its output small).
+ * Returns `undefined` on failure (e.g. permission denied, process exited).
+ */
+export async function readCwd(pid: number): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync("lsof", [
+      "-a",
+      "-d",
+      "cwd",
+      "-p",
+      String(pid),
+    ]);
+    // Output:
+    //   COMMAND   PID    USER   FD   TYPE DEVICE SIZE/OFF     NODE NAME
+    //   node    12345 jimmyhu  cwd    DIR   1,17      384 38856207 /abs/path
+    const lines = stdout.split("\n").filter((l) => l.trim().length > 0);
+    if (lines.length < 2) return undefined;
+    const fields = lines[1].trim().split(/\s+/);
+    // NAME is everything after the 8th field, matching parseLsof's convention.
+    const name = fields.slice(8).join(" ");
+    return name.length > 0 ? name : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function runLsof(): Promise<RawPort[]> {
+  let raw: RawPort[];
   try {
     const { stdout } = await execFileAsync("lsof", [
       "-nP",
       "-iTCP",
       "-sTCP:LISTEN",
     ]);
-    return parseLsof(stdout);
+    raw = parseLsof(stdout);
   } catch {
     return [];
   }
+  return enrichWithCwd(raw);
+}
+
+/**
+ * Enrich a list of RawPort entries with `cwd` for each PID, caching results
+ * so each PID is queried at most once across calls. New PIDs are queried in
+ * parallel; cached entries (including cached `undefined`) are reused.
+ */
+export async function enrichWithCwd(raw: RawPort[]): Promise<RawPort[]> {
+  const uncached = new Set<number>();
+  for (const p of raw) {
+    if (!cwdCache.has(p.pid)) uncached.add(p.pid);
+  }
+  await Promise.all(
+    Array.from(uncached).map(async (pid) => {
+      const cwd = await readCwd(pid);
+      cwdCache.set(pid, cwd);
+    })
+  );
+  return raw.map((p) => {
+    const cached = cwdCache.get(p.pid);
+    return cached === undefined ? p : { ...p, cwd: cached };
+  });
 }
 
 export interface DiffResult {
