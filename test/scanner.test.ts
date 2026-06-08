@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
-import { parseLsof, diff, readCwd, type RawPort } from "../src/server/scanner.js";
+import { parseLsof, diff, readCwd, computeGroupKey, type RawPort } from "../src/server/scanner.js";
 import type { Service } from "../src/server/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -128,3 +128,26 @@ async function waitForCwd(
   }
   return readCwd(pid);
 }
+
+describe("computeGroupKey", () => {
+  it("returns basename of exePath when present", () => {
+    expect(
+      computeGroupKey({
+        exePath: "/Applications/Spotify.app/Contents/MacOS/Spotify",
+        command: "Spotify",
+      })
+    ).toBe("Spotify");
+  });
+
+  it("falls back to first token of command when exePath missing", () => {
+    expect(computeGroupKey({ command: "node /path/to/server.js" })).toBe("node");
+  });
+
+  it("uses 'unknown' when neither is present", () => {
+    expect(computeGroupKey({})).toBe("unknown");
+  });
+
+  it("handles command with leading whitespace", () => {
+    expect(computeGroupKey({ command: "  python3 -m http.server" })).toBe("python3");
+  });
+});

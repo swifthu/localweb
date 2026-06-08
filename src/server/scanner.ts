@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Service } from "./types.js";
 import { enrich } from "./detector.js";
+import { readExePath, readStartTime, readPpid } from "./procinfo.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -152,12 +153,12 @@ export function diff(prev: Service[], next: Service[]): DiffResult {
   return { added, removed, updated };
 }
 
-export function computeGroupKey(s: { exePath?: string; command: string }): string {
+export function computeGroupKey(s: { exePath?: string; command?: string }): string {
   if (s.exePath) {
     const parts = s.exePath.split("/");
     return parts[parts.length - 1] || "unknown";
   }
-  const firstToken = s.command.trim().split(/\s+/)[0];
+  const firstToken = (s.command ?? "").trim().split(/\s+/)[0];
   if (!firstToken) return "unknown";
   if (firstToken.includes("/")) {
     const parts = firstToken.split("/");
@@ -191,12 +192,18 @@ export class Scanner {
     const services: Service[] = await Promise.all(
       raw.map(async (p) => {
         const det = await enrich(p);
+        const exePath = readExePath(p.pid);
+        const startedAt = readStartTime(p.pid);
+        const ppid = readPpid(p.pid);
         const svc = {
           ...p,
           label: det.label,
           confidence: det.confidence,
           httpHeaders: det.httpHeaders,
           lastSeen: Date.now(),
+          exePath,
+          startedAt,
+          ppid,
         };
         return { ...svc, groupKey: computeGroupKey(svc) };
       })
