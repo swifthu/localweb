@@ -17,6 +17,11 @@ export interface Service {
   ppid?: number;
   servicePreset?: Preset;
   groupKey: string;
+
+  // v0.3 additions
+  projectName?: string;
+  parentChain?: string;
+  httpTitle?: string;
 }
 
 export interface Preset {
