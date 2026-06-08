@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detect, detectFromHeaders } from "../src/server/detector.js";
+import { detect, detectFromHeaders, extractProjectName } from "../src/server/detector.js";
 import type { RawPort } from "../src/server/scanner.js";
 import { lookup } from "../src/server/presets.js";
 
@@ -70,5 +70,39 @@ describe("detector + presets", () => {
   it("enrichment can include servicePreset when port matches", () => {
     const preset = lookup(5432);
     expect(preset?.name).toBe("PostgreSQL");
+  });
+});
+
+describe("extractProjectName", () => {
+  it("returns basename of a typical project cwd", () => {
+    expect(extractProjectName({ cwd: "/Users/foo/code/myapp" })).toBe("myapp");
+  });
+
+  it("returns basename of a deeper project", () => {
+    expect(extractProjectName({ cwd: "/home/dev/projects/dashboard-ui" })).toBe("dashboard-ui");
+  });
+
+  it("returns undefined for system /usr/libexec", () => {
+    expect(extractProjectName({ cwd: "/usr/libexec" })).toBeUndefined();
+  });
+
+  it("returns undefined for /System/Library", () => {
+    expect(extractProjectName({ cwd: "/System/Library/PrivateFrameworks" })).toBeUndefined();
+  });
+
+  it("returns undefined for HOME root", () => {
+    expect(extractProjectName({ cwd: "/Users/foo" })).toBeUndefined();
+  });
+
+  it("returns undefined for /", () => {
+    expect(extractProjectName({ cwd: "/" })).toBeUndefined();
+  });
+
+  it("returns undefined when no cwd", () => {
+    expect(extractProjectName({})).toBeUndefined();
+  });
+
+  it("returns undefined for .app bundle cwd (macOS app, exePath already covers)", () => {
+    expect(extractProjectName({ cwd: "/Applications/Spotify.app/Contents" })).toBeUndefined();
   });
 });
