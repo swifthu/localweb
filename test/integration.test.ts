@@ -88,3 +88,42 @@ describe("M2 WebSocket push", () => {
     child.kill();
   }, 15000);
 });
+
+describe("M3 kill", () => {
+  it("kills a real child process via /api/kill", async () => {
+    const port = 19400 + Math.floor(Math.random() * 100);
+    const child = spawn("python3", ["-m", "http.server", String(port)], { stdio: "ignore" });
+    await wait(800);
+    const childPid = child.pid!;
+
+    // Find the pid from the API
+    const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
+    const arr = (await res.json()) as Array<{ port: number; pid: number }>;
+    const target = arr.find((s) => s.port === port);
+    expect(target).toBeDefined();
+
+    const killRes = await fetch(`http://127.0.0.1:${serverPort}/api/kill`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pid: target!.pid }),
+    });
+    expect(killRes.ok).toBe(true);
+
+    // Wait for child to exit (python http.server has no SIGTERM handler and dies
+    // with code=null, signal=SIGTERM, which is the standard POSIX outcome)
+    const exit = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+      (r) => child.on("exit", (code, signal) => r({ code, signal }))
+    );
+    const exitedCleanly = exit.code === 0 || exit.signal === "SIGTERM";
+    expect(exitedCleanly).toBe(true);
+  }, 15000);
+
+  it("returns 404 for non-existent pid", async () => {
+    const res = await fetch(`http://127.0.0.1:${serverPort}/api/kill`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pid: 2_000_000_000 }),
+    });
+    expect(res.status).toBe(404);
+  });
+});
