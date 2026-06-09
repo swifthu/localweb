@@ -15,6 +15,10 @@
   --banner-bg: #4a1f1f;
   --banner-fg: #ffd0d0;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --cat-sys-color: #f87171;
+  --cat-localweb-color: #d1d5db;
+  --cat-app-color: #60a5fa;
+  --cat-self-color: #4ade80;
 }
 
 /* Light theme */
@@ -33,4 +37,8 @@
   --banner-bg: #ffebe9;
   --banner-fg: #82071e;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --cat-sys-color: #dc2626;
+  --cat-localweb-color: #9ca3af;
+  --cat-app-color: #3b82f6;
+  --cat-self-color: #16a34a;
 }

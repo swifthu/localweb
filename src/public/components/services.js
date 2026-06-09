@@ -4,6 +4,13 @@ import { escapeHtml, matchFilter } from "./utils.js";
 const list = () => document.getElementById("services-list");
 const emptyState = () => document.getElementById("empty-state");
 
+const CAT_COLORS = {
+  system: "var(--cat-sys-color, #dc2626)",
+  localweb: "var(--cat-localweb-color, #9ca3af)",
+  app: "var(--cat-app-color, #3b82f6)",
+  self: "var(--cat-self-color, #16a34a)",
+};
+
 function groupBy(services, key) {
   const groups = new Map();
   for (const s of services) {
@@ -18,6 +25,9 @@ function renderServiceCard(svc) {
   const li = document.createElement("li");
   li.className = "service";
   li.dataset.pid = String(svc.pid);
+  // Category color bar (4px left border) — fallback to "self" green for old clients missing `category`.
+  li.style.borderLeft = `4px solid ${CAT_COLORS[svc.category ?? "self"]}`;
+  li.style.paddingLeft = "12px";
   // Use the browser's current host (location.host = "hostname:port")
   // so the link works whether the user is on localhost or on a LAN IP.
   // Fall back to svc.address if location.host is somehow unavailable.
