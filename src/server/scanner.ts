@@ -225,7 +225,7 @@ export async function buildService(rawPort: RawPort): Promise<Service> {
     exePath: info.exePath,
     startedAt: info.startedAt,
     ppid: info.ppid,
-    parentChain,
+    parentChain: parentChain?.names.join(" → "),
     servicePreset: lookup(rawPort.port) ?? undefined,
   };
   return { ...base, groupKey: computeGroupKey(base) };

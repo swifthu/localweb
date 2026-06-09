@@ -129,11 +129,14 @@ export function readPpid(pid: number): number | undefined {
   return cache.get(pid)!.ppid;
 }
 
-export async function getParentChainAsync(pid: number, maxDepth = 5): Promise<string | undefined> {
-  // Walk up the PPID chain, collecting command names.
+export async function getParentChainAsync(
+  pid: number,
+  maxDepth = 5
+): Promise<{ names: string[]; pids: number[] } | undefined> {
+  // Walk up the PPID chain, collecting command names and PIDs in parallel.
   // Cache-aware: reuses the same readPpid + readCommand as the rest of procinfo.
   const seen = new Set<number>();
-  const names: string[] = [];
+  const entries: { name: string; ppid: number }[] = [];
   let current = pid;
   for (let i = 0; i < maxDepth; i++) {
     if (seen.has(current)) break;
@@ -143,17 +146,19 @@ export async function getParentChainAsync(pid: number, maxDepth = 5): Promise<st
     const cmd = await readCommand(current);
     const ppid = readPpid(current);
     if (cmd === undefined && ppid === undefined) return undefined; // no info
-    names.push(cmd || "?");
+    entries.push({ name: cmd || "?", ppid: ppid ?? 0 });
     if (ppid === undefined || ppid <= 1) break;
     current = ppid;
   }
+  const names = entries.map((e) => e.name);
+  const pids = entries.map((e) => e.ppid);
   const chain = names.join(" → ");
-  // Persist the chain on the original PID's procinfo entry so the sync
-  // getParentChain() can read it from the same per-PID cache.
+  // Persist the joined chain on the original PID's procinfo entry so the
+  // sync getParentChain() can read it from the same per-PID cache.
   const cached = cache.get(pid) ?? {};
   cached.parentChain = chain;
   cache.set(pid, cached);
-  return chain;
+  return { names, pids };
 }
 
 async function readCommand(pid: number): Promise<string | undefined> {
