@@ -129,14 +129,27 @@ export function readPpid(pid: number): number | undefined {
   return cache.get(pid)!.ppid;
 }
 
+/**
+ * 异步取一个进程的父进程链。
+ *
+ * 返回 names 和 pids 两个平行数组,1:1 对应:
+ * - names[i]: 第 i 层的进程名(command)
+ * - pids[i]:  第 i 层父进程的 pid(ppid),即产生 names[i] 那个进程的父进程
+ * - pids[0] 是 leaf 进程的父进程(leaf 本身是输入 pid,不在 pids 里)
+ *
+ * 如果 pid 不可达或读不到 command/ppid,返回 undefined。
+ * 如果某层 ppid 缺失,该位置的 pids[i] 为 undefined(不与任何真实 pid 冲突)。
+ *
+ * 同步版 getParentChain() 仍从 cache 读 joined string。
+ */
 export async function getParentChainAsync(
   pid: number,
   maxDepth = 5
-): Promise<{ names: string[]; pids: number[] } | undefined> {
+): Promise<{ names: string[]; pids: Array<number | undefined> } | undefined> {
   // Walk up the PPID chain, collecting command names and PIDs in parallel.
   // Cache-aware: reuses the same readPpid + readCommand as the rest of procinfo.
   const seen = new Set<number>();
-  const entries: { name: string; ppid: number }[] = [];
+  const entries: { name: string; ppid: number | undefined }[] = [];
   let current = pid;
   for (let i = 0; i < maxDepth; i++) {
     if (seen.has(current)) break;
@@ -146,7 +159,7 @@ export async function getParentChainAsync(
     const cmd = await readCommand(current);
     const ppid = readPpid(current);
     if (cmd === undefined && ppid === undefined) return undefined; // no info
-    entries.push({ name: cmd || "?", ppid: ppid ?? 0 });
+    entries.push({ name: cmd || "?", ppid });
     if (ppid === undefined || ppid <= 1) break;
     current = ppid;
   }
