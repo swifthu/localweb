@@ -1,3 +1,5 @@
+import type { ServiceCategory } from "./category.js";
+
 export interface Service {
   pid: number;
   port: number;
@@ -22,6 +24,10 @@ export interface Service {
   projectName?: string;
   parentChain?: string;
   httpTitle?: string;
+
+  // v0.4 additions
+  parentPids?: Array<number | undefined>;
+  category?: ServiceCategory;
 }
 
 export interface Preset {

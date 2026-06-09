@@ -89,6 +89,7 @@ async function main() {
   process.on("unhandledRejection", (err) => {
     lastScanError = err instanceof Error ? err.message : String(err);
   });
+  const localwebPid = process.pid;
   const scanner = new Scanner((next) => {
     const filtered = next.filter((s) =>
       s.protocol === "tcp" ? config.protocolFilter.tcp : config.protocolFilter.udp
@@ -101,7 +102,7 @@ async function main() {
       if (d.updated.length) hub.broadcast({ type: "updated", services: d.updated });
       if (d.removed.length) hub.broadcast({ type: "removed", pids: d.removed });
     }
-  });
+  }, localwebPid);
   scanner.start();
   if (!args.noPreshared) {
     await preshared.autostartAll();

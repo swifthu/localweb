@@ -4,6 +4,7 @@ import type { Service } from "./types.js";
 import { enrich } from "./detector.js";
 import { readProcInfo, getParentChainAsync } from "./procinfo.js";
 import { lookup } from "./presets.js";
+import { classifyService } from "./category.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -174,6 +175,7 @@ export class Scanner {
 
   constructor(
     private onUpdate: (services: Service[]) => void,
+    private localwebPid: number,
     private intervalMs = 2000
   ) {}
 
@@ -192,7 +194,9 @@ export class Scanner {
     const raw = await runLsof();
     // buildService internally awaits both procinfo fill and parent-chain
     // fill per PID, so a single Promise.all runs everything in parallel.
-    const services: Service[] = await Promise.all(raw.map(buildService));
+    const services: Service[] = await Promise.all(
+      raw.map((r) => buildService(r, this.localwebPid))
+    );
     this.prev = services;
     this.onUpdate(services);
   }
@@ -208,7 +212,10 @@ export class Scanner {
  * /api/services) may briefly see undefined until the async fill resolves.
  * `servicePreset` is filled from the presets registry via lookup(port).
  */
-export async function buildService(rawPort: RawPort): Promise<Service> {
+export async function buildService(
+  rawPort: RawPort,
+  localwebPid: number
+): Promise<Service> {
   const [det, info, parentChain] = await Promise.all([
     enrich(rawPort, rawPort.cwd),
     readProcInfo(rawPort.pid),
@@ -226,6 +233,13 @@ export async function buildService(rawPort: RawPort): Promise<Service> {
     startedAt: info.startedAt,
     ppid: info.ppid,
     parentChain: parentChain?.names.join(" → "),
+    parentPids: parentChain?.pids,
+    category: classifyService(
+      rawPort.pid,
+      info.exePath,
+      parentChain?.pids.filter((p): p is number => p !== undefined),
+      localwebPid
+    ),
     servicePreset: lookup(rawPort.port) ?? undefined,
   };
   return { ...base, groupKey: computeGroupKey(base) };
