@@ -431,3 +431,54 @@ describe("M3 v0.3 HTTP title probe", () => {
     }
   }, 15000);
 });
+
+describe("M3 v0.4 WS kill", () => {
+  it("kills a real child process via WS {type:'kill'} message", async () => {
+    const port = 19500 + Math.floor(Math.random() * 100);
+    const child = spawn("python3", ["-m", "http.server", String(port)], {
+      stdio: "ignore",
+    });
+    await wait(800);
+
+    try {
+      // Find pid from API
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
+      const arr = (await res.json()) as Array<{ port: number; pid: number }>;
+      const target = arr.find((s) => s.port === port);
+      expect(target).toBeDefined();
+
+      // Open WS, send kill, wait for child to exit
+      const ws = new WebSocket(`ws://127.0.0.1:${serverPort}/ws`);
+      await new Promise<void>((r) => ws.once("open", r));
+
+      const exit = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+        (r) => child.on("exit", (code, signal) => r({ code, signal }))
+      );
+      ws.send(JSON.stringify({ type: "kill", pid: target!.pid }));
+
+      const result = await Promise.race([
+        exit,
+        wait(5000).then(() => ({ code: -1, signal: null as NodeJS.Signals | null })),
+      ]);
+      // python http.server has no SIGTERM handler → exits via signal SIGTERM
+      expect(result.code).toBeNull();
+      expect(result.signal).toBe("SIGTERM");
+
+      ws.close();
+    } finally {
+      child.kill("SIGKILL");
+      await wait(200);
+    }
+  }, 15000);
+
+  it("WS kill with dead pid does not crash the server", async () => {
+    const ws = new WebSocket(`ws://127.0.0.1:${serverPort}/ws`);
+    await new Promise<void>((r) => ws.once("open", r));
+    ws.send(JSON.stringify({ type: "kill", pid: 2_000_000_000 }));
+    await wait(500);
+    // Server still healthy
+    const res = await fetch(`http://127.0.0.1:${serverPort}/api/health`);
+    expect(res.ok).toBe(true);
+    ws.close();
+  }, 10000);
+});

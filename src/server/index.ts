@@ -15,6 +15,7 @@ import { PresharedManager } from "./preshared.js";
 import { loadConfig, DEFAULT_CONFIG_PATH } from "./config.js";
 import { expandHome } from "./paths.js";
 import { kill as procKill } from "./proc.js";
+import { executeKill } from "./kill.js";
 import type { Config, Service } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -67,7 +68,11 @@ async function main() {
   const hub = new WsHub(
     () => ({ type: "snapshot", services: currentServices }),
     (msg) => {
-      if (msg.type === "kill-force") procKill(msg.pid);
+      if (msg.type === "kill") {
+        executeKill(hub, () => currentServices, msg.pid);
+      } else if (msg.type === "kill-force") {
+        procKill(msg.pid);
+      }
     }
   );
   attachWs(httpServer, hub);
