@@ -221,6 +221,7 @@ export async function buildService(
     readProcInfo(rawPort.pid),
     getParentChainAsync(rawPort.pid, 5),
   ]);
+  const filteredPids = parentChain?.pids.filter((p): p is number => p !== undefined);
   const base = {
     ...rawPort,
     label: det.label,
@@ -233,13 +234,8 @@ export async function buildService(
     startedAt: info.startedAt,
     ppid: info.ppid,
     parentChain: parentChain?.names.join(" → "),
-    parentPids: parentChain?.pids,
-    category: classifyService(
-      rawPort.pid,
-      info.exePath,
-      parentChain?.pids.filter((p): p is number => p !== undefined),
-      localwebPid
-    ),
+    parentPids: filteredPids,
+    category: classifyService(rawPort.pid, info.exePath, filteredPids, localwebPid),
     servicePreset: lookup(rawPort.port) ?? undefined,
   };
   return { ...base, groupKey: computeGroupKey(base) };

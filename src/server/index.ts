@@ -56,7 +56,8 @@ async function main() {
   app.use("/static", express.static(publicDir));
   app.get("/", (_req, res) => res.sendFile(join(publicDir, "index.html")));
   app.use(healthRouter(port));
-  app.use(servicesRouter());
+  const localwebPid = process.pid;
+  app.use(servicesRouter(localwebPid));
   app.use(configRouter(() => configPath));
 
   app.get("/api/status", (_req, res) => {
@@ -89,7 +90,6 @@ async function main() {
   process.on("unhandledRejection", (err) => {
     lastScanError = err instanceof Error ? err.message : String(err);
   });
-  const localwebPid = process.pid;
   const scanner = new Scanner((next) => {
     const filtered = next.filter((s) =>
       s.protocol === "tcp" ? config.protocolFilter.tcp : config.protocolFilter.udp

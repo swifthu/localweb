@@ -172,7 +172,7 @@ describe("buildService", () => {
         user: "u",
       };
 
-      const svc = await buildService(raw);
+      const svc = await buildService(raw, 99999);
 
       // Raw fields are preserved
       expect(svc.pid).toBe(pid);
@@ -189,6 +189,8 @@ describe("buildService", () => {
       expect(svc.ppid).toBeTypeOf("number");
       // groupKey is derived from exePath basename
       expect(svc.groupKey).toBe("node");
+      // category is populated (locks in that localwebPid was threaded through)
+      expect(svc.category).toMatch(/system|localweb|self|app/);
     } finally {
       child.kill("SIGKILL");
     }
@@ -205,7 +207,7 @@ describe("buildService", () => {
       command: "python3 -m http.server",
       user: "u",
     };
-    const svc = await buildService(raw);
+    const svc = await buildService(raw, 99999);
     expect(svc.exePath).toBeUndefined();
     expect(svc.groupKey).toBe("python3");
   });

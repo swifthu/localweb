@@ -26,7 +26,7 @@ export interface Service {
   httpTitle?: string;
 
   // v0.4 additions
-  parentPids?: Array<number | undefined>;
+  parentPids?: number[];
   category?: ServiceCategory;
 }
 
