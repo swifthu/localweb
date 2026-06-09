@@ -81,7 +81,9 @@ async function handleKillClick(pid) {
     "Confirm kill",
     `Terminate ${svc.label} on port ${svc.port} (pid ${svc.pid})?`
   );
-  if (ok) ws?.send(JSON.stringify({ type: "kill", pid }));
+  if (!ok) return;
+  ws?.send(JSON.stringify({ type: "kill", pid }));
+  await loadSnapshot();
 }
 
 async function handleCopyClick(url, button) {
