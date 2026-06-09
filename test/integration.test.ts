@@ -482,3 +482,32 @@ describe("M3 v0.4 WS kill", () => {
     ws.close();
   }, 10000);
 });
+
+describe("M5 v0.4 service category", () => {
+  it("spawned python process has category 'self'", async () => {
+    const port = 20600 + Math.floor(Math.random() * 100);
+    const child = spawn("python3", ["-m", "http.server", String(port)], {
+      stdio: "ignore",
+    });
+    try {
+      await wait(5000);
+      const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
+      const arr = (await res.json()) as Array<{ port: number; category?: string }>;
+      const svc = arr.find((s) => s.port === port);
+      expect(svc).toBeDefined();
+      // python3 from homebrew is at /opt/homebrew/.../python3.14 → matches 'self' regex
+      expect(svc!.category).toBe("self");
+    } finally {
+      child.kill("SIGKILL");
+      await wait(200);
+    }
+  }, 15000);
+
+  it("localweb process itself has category 'localweb'", async () => {
+    const res = await fetch(`http://127.0.0.1:${serverPort}/api/services`);
+    const arr = (await res.json()) as Array<{ port: number; category?: string }>;
+    const me = arr.find((s) => s.port === serverPort);
+    expect(me).toBeDefined();
+    expect(me!.category).toBe("localweb");
+  }, 10000);
+});
